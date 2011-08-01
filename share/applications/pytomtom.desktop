@@ -1,0 +1,15 @@
+[Desktop Entry]
+Version=1.0
+Encoding=UTF-8
+Name=pyTOMTOM
+Type=Application
+GenericName=pyTOMTOM
+Comment=Manage your TomTom device
+Comment[de]=Verwalten Sie Ihr TomTom !
+Comment[fr]=Gérez votre GPS TomTom !
+Comment[it]=Gestisci il tuo TomTom !
+Icon=/usr/share/pixmaps/pytomtom.png
+Exec=pytomtom
+Terminal=false
+StartupNotify=false
+Categories=GNOME;GTK;Utility;
