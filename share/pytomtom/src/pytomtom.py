@@ -115,11 +115,14 @@ class NotebookTomtom:
     boxInit = 4
     ## chipset siRFStarIII models
     siRFStarIII = ["Carminat",
+	"GO 300",
+	"GO 500",
 	"GO 510",
 	"GO 520",
 	"GO 530",
 	"GO 540 LIVE",
 	"GO 630",
+	"GO 700",
 	"GO 710",
 	"GO 720",
 	"GO 730",
