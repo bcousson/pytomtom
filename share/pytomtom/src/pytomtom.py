@@ -63,7 +63,7 @@ import termios, fcntl, struct
 #----------------------------------------------- GLOBAL DEFINITION  ---------------------------------------------------------
 ## name,  version and homepage
 App = "pyTOMTOM"
-Ver = "0.5"
+Ver = "0.6 alpha 1"
 WebUrl = "http://pytomtom.tuxfamily.org"
 
 ## i18n (internationalisation) /usr/share/locale
@@ -112,7 +112,7 @@ class NotebookTomtom:
     CurrentMap = False
     ## tab at pytomtom start, by default "About"
     ## 0=options, 1=GPSQuickFix, 2=Save&Restore, 3=poi, 4=about, 5=quit
-    boxInit = 4
+    boxInit = 5
     ## chipset siRFStarIII models
     siRFStarIII = ["Carminat",
 	"GO 300",
@@ -963,11 +963,11 @@ class NotebookTomtom:
 	## TODO : mettre en place la reconnaissance des noms des images a remplacer
 	if ( os.path.exists( self.ptMount +"/splash.bmp" ) ):
 		return True ##ecran normal n
+		## subprocess.call( [ "convert image.jpg -resize 320x240 -background black -gravity center -extent 320x240 splash.bmp" ], shell = True )
 	else: 
-		if ( os.path.exists( self.ptMount +"/splashw.bmp" ) ): ##elif ??
+		if ( os.path.exists( self.ptMount +"/splashw.bmp" ) ): ##elif ?? non
 			return True ##ecran widescreen w
-	
-	## subprocess.call( [ "convert image.jpg -resize 320x240 -background black -gravity center -extent 320x240 splash.bmp" ], shell = True )
+			## subprocess.call( [ "convert image.jpg -resize 480x272 -background black -gravity center -extent 480x272 splash.bmp" ], shell = True )
 
     ##++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
     ## Fonction de creation d'un nom de fichier de sauvegarde
@@ -1860,9 +1860,9 @@ class NotebookTomtom:
 	##TODO verifier presence ImageMagick
 	## subprocess.call( [ "convert image.jpg -resize 320x240 -background black -gravity center -extent 320x240 splash.bmp" ], shell = True )
 	## bouton 
-        b = gtk.Button( _( "button" ) )
+        b = gtk.Button( _( "Select image..." ) )
 	tabBoxRight.pack_start( b, True, False, 2 )
-        b.connect( "clicked", self.Delete )
+        b.connect( "clicked", self.selectImg )
 
         eventBox = self.CreateCustomTab( _( "Personalize" ), notebook, frame )
 	
@@ -1985,6 +1985,34 @@ class NotebookTomtom:
 		##self.labelfolder.set_text( dossier )
 		self.popup.destroy()
 
+	return True
+	
+    ##++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+    ## fonction parcourir pour selectionner un fichier gtk.FILE_CHOOSER_ACTION_OPEN
+    def selectImg( self,entry ):
+	
+	self.popup = gtk.FileChooserDialog( _( "Open folder..." ), gtk.Window( gtk.WINDOW_TOPLEVEL ), 
+		gtk.FILE_CHOOSER_ACTION_OPEN, ( gtk.STOCK_CANCEL, gtk.RESPONSE_CANCEL, gtk.STOCK_OPEN, gtk.RESPONSE_OK ) );
+	filter = gtk.FileFilter()
+	filter.set_name( "images" )
+	filter.add_pattern( "*.jpg" )
+	filter.add_pattern( "*.png" )
+	self.popup.add_filter( filter )
+	repHome = os.getenv( "HOME" )
+	self.popup.set_current_folder( repHome )
+	
+	if( self.popup.run() == gtk.RESPONSE_OK ):
+		imgSelected = self.popup.get_filename()
+		self.Debug( 5, imgSelected )
+		## on y copie-convertit les fichiers
+		##self.ptMount = ptMount
+		cmd = ("convert '" + imgSelected + "' -resize 320x240 -background black -gravity center -extent 320x240 '"+ self.ptMount + "/splash.bmp'")
+		p = subprocess.Popen( cmd, shell=True )
+		p.wait()
+				
+	self.popup.destroy()
+	self.Popup( _( "OK" ) )
+						
 	return True
 	
     ##++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
@@ -2120,7 +2148,7 @@ class NotebookTomtom:
 			self.FrameGPSQuickFix( notebook )
 			self.FrameBackupRestore( notebook )
 			self.FramePoi( notebook )
-			##self.FramePersonalize( notebook )
+			self.FramePersonalize( notebook )
 		self.FrameAbout( notebook )
 		self.FrameQuit( notebook )
 		##*************************************************************************************************************
