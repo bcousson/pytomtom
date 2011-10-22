@@ -5,7 +5,7 @@
 ## http://pytomtom.tuxfamily.org
 ## dev : Thomas LEROY
 ## sorry for my bad english in comments...
-## python (>=2.5), python-gtk2, cabextract
+## python (>=2.5), python-gtk2, cabextract,  ImageMagick
 
 #----------------------------------------------- DEVELOPPEMENT RULES DEFINITION --------------------------------------
 ## developpement rules
@@ -111,7 +111,7 @@ class NotebookTomtom:
     ## current map in use, false = unknow
     CurrentMap = False
     ## tab at pytomtom start, by default "About"
-    ## 0=options, 1=GPSQuickFix, 2=Save&Restore, 3=poi, 4=about, 5=quit
+    ## 0=options, 1=GPSQuickFix, 2=Save&Restore, 3=poi, 4=personalize, 5=about, 6=quit
     boxInit = 5
     ## chipset siRFStarIII models
     siRFStarIII = ["Carminat",
@@ -138,6 +138,10 @@ class NotebookTomtom:
 	"GO 750 LIVE",
 	"GO 940 LIVE",
 	"GO 950 LIVE",
+	"GO LIVE 820",
+	"GO LIVE 825",
+	"GO Live 1000",
+	"GO Live 1005",
 	"ONE 2nd Edition (G)",
 	"ONE 3rd Edition",
 	"ONE 30 Series",
@@ -147,6 +151,9 @@ class NotebookTomtom:
 	"ONE XL",
 	"Start",
 	"Start 2",
+	"Via 110",
+	"Via 120",
+	"Via 125",
 	"XL 30 Series",
 	"XL IQ Routes",
 	"XL LIVE IQ Routes"]
@@ -2004,14 +2011,27 @@ class NotebookTomtom:
 	if( self.popup.run() == gtk.RESPONSE_OK ):
 		imgSelected = self.popup.get_filename()
 		self.Debug( 5, imgSelected )
-		## on y copie-convertit les fichiers
-		##self.ptMount = ptMount
-		cmd = ("convert '" + imgSelected + "' -resize 320x240 -background black -gravity center -extent 320x240 '"+ self.ptMount + "/splash.bmp'")
-		p = subprocess.Popen( cmd, shell=True )
-		p.wait()
+		self.popup.destroy()
+		## Verification de l'existence du fichier splash ou splashw.bmp
+		if( os.path.exists( self.ptMount + "/splashw.bmp" ) ):
+			cmd = ("convert '" + imgSelected + "' -resize 480x272 -background black -gravity center -extent 480x272 '"+ self.ptMount + "/splashw.bmp'")
+			p = subprocess.Popen( cmd, shell=True )
+			p.wait()
+			self.Popup( _( "OK" ) )
+			return True
+		else:
+			if( os.path.exists( self.ptMount + "/splash.bmp" ) ):
+				cmd = ("convert '" + imgSelected + "' -resize 320x240 -background black -gravity center -extent 320x240 '"+ self.ptMount + "/splash.bmp'")
+				p = subprocess.Popen( cmd, shell=True )
+				p.wait()
+				self.Popup( _( "OK" ) )
+				return True
+			else:
+				self.Popup( _( "Error" ) )
+				return True
 				
-	self.popup.destroy()
-	self.Popup( _( "OK" ) )
+	##self.popup.destroy()
+	##self.Popup( _( "OK" ) )
 						
 	return True
 	
