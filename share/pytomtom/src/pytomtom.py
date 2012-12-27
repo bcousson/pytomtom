@@ -87,15 +87,16 @@ class NotebookTomtom:
 
     ##------------------------------------------ DEFINITION DES VARIABLES GLOBALES -------------------------------------------
     ## config directory
-    dir = os.getenv( "HOME" ) + "/." + App
+    home = os.getenv( "HOME" )
+    dir = home + "/.config/" + App.lower()
     ## config file
-    configFile = App + ".cfg"
+    configFile = App.lower() + ".cfg"
     ## ephem directory on tomtom
     dest = "/ephem"
     ## poi database directory
     dirPoi = dir + "/poi/" 
     ## backup directory
-    dirBackup = dir + "/backup" 
+    dirBackup = home + "/.local/share/%s/backup" % App.lower()
     ## file needed for recognize a tomtom
     ttgo = "/tomtom.ico"
     ## pix directory (for pytomtom)
@@ -171,11 +172,14 @@ class NotebookTomtom:
     debug = 1
 
     ## log, sys.stdout (= print)
-    logFileName = dir + "/" + os.path.basename( sys.argv[ 0 ] ) + ".log"
+    logFileName = home + "/.cache/%s.log" % App.lower()
     ## ie : logFile = open( logFileName, "w" ) ## erase an write new
     ## ie : logFile = open( logFileName, "a" ) ## add and write
     ## = print
-    logFile = sys.stdout 
+    logFile = sys.stdout
+    print logFileName
+    print dir
+    print dirBackup
 
     ## by default log isn't overwrited, this option to overwrite log
     overwriteLog = False
