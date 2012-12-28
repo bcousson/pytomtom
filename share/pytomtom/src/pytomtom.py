@@ -45,39 +45,63 @@ APP = 'pyTOMTOM'
 VER = '0.6 alpha 1'
 WEB_URL = 'http://pytomtom.tuxfamily.org'
 
-# i18n (internationalisation) /usr/share/locale
-gettext.bindtextdomain('pytomtom', '../share/locale')
+
+# User relative paths
+CFG_PATH = os.getenv('HOME') + '/.' + APP
+# config file
+CFG_FILE = APP + '.cfg'
+# POI database directory
+POI_PATH = CFG_PATH + '/poi/'
+# backup directory
+BACKUP_PATH = CFG_PATH + '/backup'
+
+# Application relative paths
+APP_PATH = os.path.dirname(os.path.abspath(__file__))
+# pix directory (for pytomtom UI)
+PIX_PATH = APP_PATH + '/../pix/'
+APP_NAME = os.path.basename(sys.argv[0])
+
+# i18n (internationalisation)
+gettext.bindtextdomain('pytomtom', APP_PATH + '/../../locale')
 gettext.textdomain('pytomtom')
 _ = gettext.gettext
 
 # TODO: In non-text mode launched from a terminal, an error message
-# happens. It does not prevent to launch the application nor its
-# functionalities, but it would be cleaner do avoid it.
+# happens. It does not prevent the application to run properly,
+# but it would be cleaner do avoid it.
+#
 # BC: Need more details about that issue in order to fix it.
 
 # Only Linux is supported so far, so exit if the OS is not posix
 # compliant
 if os.name != 'posix':
-    print 'You are not runnig Linux operating system'
+    print >>sys.stderr, 'You are not runnig Linux operating system'
     sys.exit(2)
+
+
+def convert_old_format(self):
+    '''Convert pyTOMTOM config path to pytomtom (=< 0.4.2 to 0.5)
+
+       This should be removed later... or not...
+    '''
+
+    # Get old config directory
+    old_dir = os.getenv('HOME') + '/.pyTOMTOM'
+    if not os.path.exists(CFG_PATH):
+        os.mkdir(CFG_PATH)
+    if os.path.exists(old_dir):
+        oldfiles = os.listdir(old_dir)
+        for f in oldfiles:
+            # move to new config directory
+            shutil.move(old_dir + '/' + f, CFG_PATH + '/' + f)
 
 
 class NotebookTomtom:
 
-    # config directory
-    dir = os.getenv('HOME') + '/.' + APP
-    # config file
-    config_file = APP + '.cfg'
     # ephem directory on tomtom
     dest = '/ephem'
-    # poi database directory
-    dir_poi = dir + '/poi/'
-    # backup directory
-    dir_backup = dir + '/backup'
     # file needed for recognize a tomtom
     ttgo = '/tomtom.ico'
-    # pix directory (for pytomtom)
-    dir_pix = '../share/pytomtom/pix/'
     # mount point, false = unknow
     mount = False
     # mount point size (octet)
@@ -153,7 +177,7 @@ class NotebookTomtom:
     log_level = 1
 
     # log, sys.stdout (= print)
-    log_file_name = dir + '/' + os.path.basename(sys.argv[0]) + '.log'
+    log_file_name = CFG_PATH + '/' + APP_NAME + '.log'
     # ie : logFile = open( logFileName, "w" ) # erase an write new
     # ie : logFile = open( logFileName, "a" ) # add and write
     # = print
@@ -231,23 +255,6 @@ class NotebookTomtom:
         print APP
         print VER
 
-    def recup(self):
-        '''conversion pyTOMTOM to pytomtom (=< 0.4.2 to 0.5)
-           later, we'll suppress this... (or not)
-
-        '''
-
-        # old config directory
-        old_dir = os.getenv('HOME') + '/.pyTOMTOM'
-        if not os.path.exists(self.dir):
-            # new config directory if not exist
-            os.mkdir(self.dir)
-        if os.path.exists(old_dir):
-            oldfiles = os.listdir(old_dir)
-            for file in oldfiles:
-                # move to new config directory
-                shutil.move(old_dir + '/' + file, self.dir + '/' + file)
-
     def latest_release(self, widget):
         '''What is the latest pytomtom release?'''
 
@@ -283,10 +290,8 @@ class NotebookTomtom:
     def usage(self):
         '''Fonction d'affichage de l'utilisation des options'''
 
-        # Utilisation de sysr.argv[ 0 ] afin d'avoir toujours le bon nom de l'executable
         print ''
-        print 'usage: ' + 'python ' + os.path.basename(sys.argv[0]) \
-            + ' [option]'
+        print 'usage: ' + 'python ' + APP_NAME + ' [option]'
         print ''
         print '    -h, --help                                 ' \
             + 'This online help'
@@ -313,11 +318,11 @@ class NotebookTomtom:
         print '    -g, --do-gpsfix                            ' \
             + 'Start update of GPSQuickFix'
         print '    -b, --do-backup                            ' \
-            + 'Start backup operation in file ' + self.dir \
+            + 'Start backup operation in file ' + CFG_PATH \
             + '/sv-[date-du-jour]-[model].tar[.gz|.bz] ' \
             + '\n                                               or provided with -f'
         print '    -r, --do-restore                           ' \
-            + 'Start restore operation from file ' + self.dir \
+            + 'Start restore operation from file ' + CFG_PATH \
             + '/sv-[date-du-jour]-[model].tar[.gz|.bz]' \
             + '\n                                               or provided with -f'
         print '    -f, --file          file-to-save           ' \
@@ -563,22 +568,22 @@ class NotebookTomtom:
         # permet de definir l'ordre de preference des donnees si les donnees sont fournies sous differentes formes
 
         # Verification de l'existence du repertoire de configuration
-        if not os.path.exists(self.dir):
+        if not os.path.exists(CFG_PATH):
             # Creation du repertoire si inexistant
-            os.mkdir(self.dir)
+            os.mkdir(CFG_PATH)
             # Verification apres creation afin de valider le systeme
-            if not os.path.exists(self.dir):
+            if not os.path.exists(CFG_PATH):
                 self.debug(0, 'Impossible to create configuration file '
-                           + self.dir)
+                           + CFG_PATH)
                 sys.exit(2)
         else:
             # Verification que le dossier de configuration en est bien un
             # TODO : verification en cas de lien vers un dossier plutot qu'un dossier
-            if os.path.isdir(self.dir):
+            if os.path.isdir(CFG_PATH):
                 # Verification de l'existence du fichier de configuration
-                if os.path.exists(self.dir + '/' + self.config_file):
+                if os.path.exists(CFG_PATH + '/' + CFG_FILE):
                     # Ouverture du fichier de configuration en lecture
-                    with open(self.dir + '/' + self.config_file, 'rb') as \
+                    with open(CFG_PATH + '/' + CFG_FILE, 'rb') as \
                         config:
                         # Lecture des lignes
                         line = config.readline()
@@ -608,7 +613,7 @@ class NotebookTomtom:
                     config.close()
             else:
                 self.debug(0, 'Configuration path is not a directory '
-                           + self.dir)
+                           + CFG_PATH)
                 sys.exit(2)
 
         # Lecture de la carte utilisee
@@ -719,7 +724,7 @@ class NotebookTomtom:
 
         # Sauvegarde des donnees dans le fichier de configuration
         try:
-            config_file = open(self.dir + '/' + self.config_file, 'wb')
+            config_file = open(CFG_PATH + '/' + CFG_FILE, 'wb')
             # L'enregistrement des options s'effectue sous le forme nom=valeur
             # getattr permet de recuperr la valeur de l'attribut fourni par son nom au format str
             for option in ('ptMount', 'model', 'configTimePassed',
@@ -1016,10 +1021,10 @@ class NotebookTomtom:
 
         # si l'option uniq est fournie, on ajoute un nombre aleatoire
         if uniq == False:
-            return self.dir_backup + '/sv-' + str(date.today()) + '-' \
+            return BACKUP_PATH + '/sv-' + str(date.today()) + '-' \
                 + self.model + '.tar'
         else:
-            return self.dir_backup + '/sv' + str(random.randint(1, 50)) + '-' \
+            return BACKUP_PATH + '/sv' + str(random.randint(1, 50)) + '-' \
                 + str(date.today()) + '-' + self.model + '.tar'
 
     # ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
@@ -1511,7 +1516,7 @@ class NotebookTomtom:
 
         # image
         image = gtk.Image()
-        image.set_from_file(self.dir_pix + 'options.png')
+        image.set_from_file(PIX_PATH + 'options.png')
         tab_box_left.pack_start(image, True, False, 2)
 
         label = gtk.Label(_('Please indicate the mounting point of your Tomtom:'
@@ -1622,7 +1627,7 @@ class NotebookTomtom:
 
         # image
         image = gtk.Image()
-        image.set_from_file(self.dir_pix + 'gpsquickfix.png')
+        image.set_from_file(PIX_PATH + 'gpsquickfix.png')
         tab_box_left.pack_start(image, True, False, 2)
 
         # label
@@ -1689,7 +1694,7 @@ in the options.'''))
 
         # image
         image = gtk.Image()
-        image.set_from_file(self.dir_pix + 'saverestore.png')
+        image.set_from_file(PIX_PATH + 'saverestore.png')
         tab_box_left.pack_start(image, True, False, 2)
 
         # Text pour le choix du fichier de sauvegarde
@@ -1721,35 +1726,35 @@ in the options.'''))
             self.save_file_combo.set_active(0)
 
         # Verification ou creation du dossier backup
-        if not os.path.exists(self.dir_backup):
-            os.mkdir(self.dir_backup)
+        if not os.path.exists(BACKUP_PATH):
+            os.mkdir(BACKUP_PATH)
         # importation des anciennes sauvegardes (pytomtom =< 0.4)
         # Ouverture de l ancien dossier de sauvegarde
-        oldfiles = os.listdir(self.dir)
+        oldfiles = os.listdir(CFG_PATH)
         for file in oldfiles:
             (f, extension) = os.path.splitext(file)
             if extension == '.tar' and (self.file_name == False
-                                        or os.path.realpath(self.dir + '/'
+                                        or os.path.realpath(CFG_PATH + '/'
                                         + file)
                                         != os.path.realpath(self.file_name)):
                 # on copie les anciennes sauvegardes dans le nouveau rep backup
-                shutil.move(self.dir + '/' + file, self.dir_backup + '/' + file)
+                shutil.move(CFG_PATH + '/' + file, BACKUP_PATH + '/' + file)
 
         # Ajout de tous les anciens fichiers de sauvegarde
         # Ouverture du dossier de sauvegarde
-        # files = os.listdir( self.dir )
-        files = os.listdir(self.dir_backup)
+        # files = os.listdir( CFG_PATH )
+        files = os.listdir(BACKUP_PATH)
         # Pour chaque fichier
         for file in files:
             # Recuperation de l'extension du fichier pour savoir s'il s'agit d'une sauvegarde
             (f, extension) = os.path.splitext(file)
             # Ajout du fichier de sauvegarde, s'il s'agit d'une sauvegarde, et qu'il ne s'agit pas du fichier fourni en option
-            # if( extension == ".tar" and ( self.fileName == False or os.path.realpath( self.dir + "/" + file ) != os.path.realpath( self.fileName ) ) ):
+            # if( extension == ".tar" and ( self.fileName == False or os.path.realpath( CFG_PATH + "/" + file ) != os.path.realpath( self.fileName ) ) ):
             if extension == '.tar' and (self.file_name == False
-                                        or os.path.realpath(self.dir_backup
+                                        or os.path.realpath(BACKUP_PATH
                                         + '/' + file)
                                         != os.path.realpath(self.file_name)):
-                self.save_file_combo.append_text(self.dir_backup + '/' + file)
+                self.save_file_combo.append_text(BACKUP_PATH + '/' + file)
 
         # self.saveFileCombo.set_size_request ( 60, -1 )
         tab_box_right.pack_start(self.save_file_combo, True, False, 0)
@@ -1857,7 +1862,7 @@ For information, 25 minutes and 1GB on disk for a One Series 30'''))
 
         # image
         image = gtk.Image()
-        image.set_from_file(self.dir_pix + 'poi.png')
+        image.set_from_file(PIX_PATH + 'poi.png')
         tab_box_left.pack_start(image, True, False, 2)
 
         labelfirststep = \
@@ -1889,9 +1894,9 @@ For information, 25 minutes and 1GB on disk for a One Series 30'''))
         self.poi_combo.set_active(0)
 
         # Ajout de tous les anciens poi
-        if os.path.exists(self.dir_poi):
+        if os.path.exists(POI_PATH):
             # Ouverture du dossier des poi
-            files = os.listdir(self.dir_poi)
+            files = os.listdir(POI_PATH)
             # print files
             # On tri par ordre alphabetique
             files.sort()
@@ -1959,7 +1964,7 @@ For information, 25 minutes and 1GB on disk for a One Series 30'''))
 
         # image
         image = gtk.Image()
-        image.set_from_file(self.dir_pix + 'personalize.png')
+        image.set_from_file(PIX_PATH + 'personalize.png')
         tab_box_left.pack_start(image, True, False, 2)
 
         # label
@@ -2000,7 +2005,7 @@ For information, 25 minutes and 1GB on disk for a One Series 30'''))
 
         # image
         image = gtk.Image()
-        image.set_from_file(self.dir_pix + 'pytomtom.png')
+        image.set_from_file(PIX_PATH + 'pytomtom.png')
         tab_box.pack_start(image, True, False, 2)
 
         # On crée un label "text" (text donné en attribut)
@@ -2056,7 +2061,7 @@ For information, 25 minutes and 1GB on disk for a One Series 30'''))
 
         # image
         image = gtk.Image()
-        image.set_from_file(self.dir_pix + 'quit.png')
+        image.set_from_file(PIX_PATH + 'quit.png')
         tab_box_left.pack_start(image, True, False, 2)
 
         # label
@@ -2161,9 +2166,9 @@ For information, 25 minutes and 1GB on disk for a One Series 30'''))
         rep_home = os.getenv('HOME')
         self.popup.set_current_folder(rep_home)
 
-        if not os.path.exists(self.dir_poi):
+        if not os.path.exists(POI_PATH):
             # Creation du repertoire si inexistant
-            os.mkdir(self.dir_poi)
+            os.mkdir(POI_PATH)
 
         if self.popup.run() == gtk.RESPONSE_OK:
             dir_selected = self.popup.get_filename()
@@ -2171,11 +2176,11 @@ For information, 25 minutes and 1GB on disk for a One Series 30'''))
             # on recupere juste le nom du repertoire qui servira a nommer le poi
             (filepath, filename) = os.path.split(dir_selected)
             # on cree le rep du poi dans la base
-            cmd = "mkdir -p '" + self.dir_poi + filename + "'"
+            cmd = "mkdir -p '" + POI_PATH + filename + "'"
             p = subprocess.Popen(cmd, shell=True)
             p.wait()
             # on y copie les fichiers
-            cmd = "cp '" + dir_selected + "/'* '" + self.dir_poi + filename \
+            cmd = "cp '" + dir_selected + "/'* '" + POI_PATH + filename \
                 + "/'"
             p = subprocess.Popen(cmd, shell=True)
             p.wait()
@@ -2192,7 +2197,7 @@ For information, 25 minutes and 1GB on disk for a One Series 30'''))
     def add_poi_to_tomtom(self, entry):
 
         selected_poi = self.poi_combo.get_active_text()
-        cmd = "cp '" + self.dir_poi + selected_poi + "/'* '" + self.pt_mount \
+        cmd = "cp '" + POI_PATH + selected_poi + "/'* '" + self.ptMount \
             + "'/" + self.current_map
         p = subprocess.Popen(cmd, shell=True)
         p.wait()
@@ -2205,9 +2210,9 @@ For information, 25 minutes and 1GB on disk for a One Series 30'''))
     def del_poi_on_tomtom(self, entry):
 
         selected_poi = self.poi_combo.get_active_text()
-        files = os.listdir(self.dir_poi + selected_poi)
+        files = os.listdir(POI_PATH + selected_poi)
         for file in files:
-            cmd = "rm -f '" + self.pt_mount + "'/" + self.current_map + "/'" \
+            cmd = "rm -f '" + self.ptMount + "'/" + self.current_map + "/'" \
                 + file + "'"
             p = subprocess.Popen(cmd, shell=True)
             p.wait()
@@ -2221,7 +2226,7 @@ For information, 25 minutes and 1GB on disk for a One Series 30'''))
     def del_poi_from_database(self, entry):
         # on supprime  les fichiers
         selected_poi = self.poi_combo.get_active_text()
-        cmd = "rm -rf '" + self.dir_poi + selected_poi + "'"
+        cmd = "rm -rf '" + POI_PATH + selected_poi + "'"
         # print cmd
         p = subprocess.Popen(cmd, shell=True)
         p.wait()
@@ -2250,9 +2255,10 @@ For information, 25 minutes and 1GB on disk for a One Series 30'''))
     # Fonction de demarrage de la classe
     def __init__(self):
 
-        # recuperation de pyTOMTOM en pytomtom (=<0.4.2)
-        # self.Recup()
-        # Recuperation de la configuration
+        # Convert old pyTOMTOM path into pytomtom (=<0.4.2)
+        # convert_old_format()
+
+        # Read configuration
         self.get_config()
 
         # Si on est pas en mode script
@@ -2263,7 +2269,7 @@ For information, 25 minutes and 1GB on disk for a One Series 30'''))
             self.window.connect('delete_event', self.delete)
             self.window.set_border_width(10)
             self.window.set_title(APP)
-            self.window.set_icon_from_file(self.dir_pix + 'icon.png')
+            self.window.set_icon_from_file(PIX_PATH + 'icon.png')
             # centrage de la fenetre
             self.window.set_position(gtk.WIN_POS_CENTER)
             # timeout for tooltips
