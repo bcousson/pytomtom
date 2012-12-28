@@ -102,7 +102,7 @@ class NotebookTomtom:
     dest = '/ephem'
     # file needed for recognize a tomtom
     ttgo = '/tomtom.ico'
-    # mount point, false = unknow
+    # mount point, False = unknown
     mount = False
     # mount point size (octet)
     pt_mount_size = -1
@@ -116,7 +116,7 @@ class NotebookTomtom:
     # 0=options, 1=GPSQuickFix, 2=Save&Restore, 3=poi, 4=personalize, 5=about, 6=quit
     box_init = 5
     # chipset siRFStarIII models
-    si_rfstar_iii = [
+    sirfstarIII = [
         'Carminat',
         'GO 300',
         'GO 500',
@@ -163,13 +163,9 @@ class NotebookTomtom:
         'XL IQ Routes',
         'XL LIVE IQ Routes',
         ]
+
     # all models
-    # TODO : not use append, extend instead ?
-    models = []
-    for model in si_rfstar_iii:
-        models.append(model)
-    for model in global_locate:
-        models.append(model)
+    models = sirfstarIII + global_locate
     # alphabetic sort
     models.sort()
 
@@ -217,20 +213,21 @@ class NotebookTomtom:
     tempo_delay = 3000
     # timestamp at start, to calculate estimated time remind and estimated total time
     tempo_start_time = None
-    # minuteur pour le refraichissement du combo contenant la liste des points de montages
+    # timer for list of potential mount combo refresh
     tempo_combo = None
-    # Verification de la possibilite d'effectuer le GPSFix (presence de cabextract)
+    # Is GPS quick fix doable (cabextract is installed)
     could_gps_fix = True
-    # Verification de la possibilite d'effectuer le backup (presence de tar)
+    # Is backup doable (tar is installed)
     could_backup = True
-    # Si l'utilisateur veut quitter avant la fin d'un sous-processus, la sauvegarde ou la restauration finissent puis l'application quitte
+    # If user want to quit during sub-process execution, wait
+    # completion of save / restore before exiting
     quit = False
-    # gps status at start
+    # gps status at startup
     gps_status = 'disconnected'
 
-    # objet graphique window
+    # Main window object
     window = None
-    # objet graphique de la liste des points de montage
+    # combo containing mount points
     pt_combo = None
 
     # Config entries used old (version < 0.6) variables names
@@ -243,31 +240,28 @@ class NotebookTomtom:
         'configTimeTot':'config_time_tot',
         }
 
-    def debug(self, niveau, text):
-        '''Fonction d'affichage des informations
+    def debug(self, level, text):
+        '''Helper function to log informations useful for debug
 
         '''
-        # Affichage uniquement si le niveau general de debug est superieur au niveau du debug fourni
-        if niveau <= self.log_level:
-            # Ecriture dans le fichier de log
+
+        if level <= self.log_level:
             self.log_file.write(str(date.today()) + ' ' + text + '\n')
-            # flush pour un affichage immediat
+            # flush to print without delay
             self.log_file.flush()
-        return True
 
     def print_version(self):
-        ''' Fonction d'affichage du nom et de la version de l'application
-
-        '''
 
         print ''
         print APP
         print VER
 
+
     def latest_release(self, widget):
-        '''What is the latest pytomtom release?'''
+        '''Check the latest pytomtom release'''
 
         try:
+            #BC: It looks like this link is broken :-(
             url = 'http://tomonweb.2kool4u.net/pytomtom/LATEST'
             request = urllib2.Request(url, None)
             url_file = urllib2.urlopen(request)
@@ -290,14 +284,16 @@ class NotebookTomtom:
             msg = _('Impossible to fetch data')
             self.popup(msg)
 
+
     def web_connect(self, widget):
         '''open pytomtom homepage in browser'''
 
         webbrowser.open(WEB_URL)
         return True
 
+
     def usage(self):
-        '''Fonction d'affichage de l'utilisation des options'''
+        '''Print options exhaustive help page'''
 
         print ''
         print 'usage: ' + 'python ' + APP_NAME + ' [option]'
@@ -306,7 +302,7 @@ class NotebookTomtom:
             + 'This online help'
         print '    -V, --version                              ' \
             + 'Print the name and version of this software'
-        print '    -d, --debug         niv                    ' \
+        print '    -d, --debug         level                  ' \
             + 'Debugging level, from 0 to 9'
         print '    -l, --log-file      file-to-log            ' \
             + 'Name of traces log file'
@@ -328,11 +324,11 @@ class NotebookTomtom:
             + 'Start update of GPSQuickFix'
         print '    -b, --do-backup                            ' \
             + 'Start backup operation in file ' + CFG_PATH \
-            + '/sv-[date-du-jour]-[model].tar[.gz|.bz] ' \
+            + '/sv-[date]-[model].tar[.gz|.bz] ' \
             + '\n                                               or provided with -f'
         print '    -r, --do-restore                           ' \
             + 'Start restore operation from file ' + CFG_PATH \
-            + '/sv-[date-du-jour]-[model].tar[.gz|.bz]' \
+            + '/sv-[date]-[model].tar[.gz|.bz]' \
             + '\n                                               or provided with -f'
         print '    -f, --file          file-to-save           ' \
             + 'Path of backup/restore file'
@@ -347,7 +343,6 @@ class NotebookTomtom:
 
         return True
 
-    # ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
     # Fonction de recuperation des options
     def get_opts(self):
 
@@ -522,20 +517,24 @@ class NotebookTomtom:
 
 
     def get_variables(self):
+        '''Fonction de lecture des variables d'environnement
 
-        # Lecture du point de montage (variable PYTOMTOM_PTMOUNT)
+        '''
+
+        # Get mount point env variable (PYTOMTOM_PTMOUNT)
         env = os.getenv('PYTOMTOM_PTMOUNT', False)
         if not env == False:
             self.mount = str(env)
             self.debug(5, 'Selected mounting point: ' + str(env))
 
-        # Lecture du modele PYTOMTOM_MODELE
-        env = os.getenv('PYTOMTOM_MODELE', False)
+        # Get model env variable (PYTOMTOM_MODEL)
+        env = os.getenv('PYTOMTOM_MODEL', False)
         if not env == False:
             self.model = str(env)
             self.debug(5, 'Selected model: ' + str(env))
 
-        # Lecture de l'affichage de la barre de progression
+        # Get model env variable (PYTOMTOM_CONFIG_TIME_PASSED)
+        # l'affichage de la barre de progression
         env = os.getenv('PYTOMTOM_CONFIG_TIME_PASSED', False)
         if not env == False:
             if env == 'False':
@@ -544,7 +543,6 @@ class NotebookTomtom:
                 self.config_time_passed = True
             self.debug(5, 'Elapsed time: ' + str(env))
 
-        # Lecture de l'affichage de la barre de progression
         env = os.getenv('PYTOMTOM_CONFIG_TIME_REMIND', False)
         if not env == False:
             if env == 'False':
@@ -553,7 +551,6 @@ class NotebookTomtom:
                 self.config_time_remind = True
             self.debug(5, 'Remaining time: ' + str(env))
 
-        # Lecture de l'affichage de la barre de progression
         env = os.getenv('PYTOMTOM_CONFIG_TIME_TOT', False)
         if not env == False:
             if env == 'False':
@@ -562,7 +559,7 @@ class NotebookTomtom:
                 self.config_time_tot = True
             self.debug(5, 'Total time: ' + str(env))
 
-        # Afin de valider le mode graphique, on verifie la variable d'environnement DISPLAY
+        # Check if GFX mode is possible by reading DISPLAY
         env = os.getenv('DISPLAY', False)
         if env == False or env == '':
             self.no_gui = True
@@ -572,18 +569,19 @@ class NotebookTomtom:
 
 
     def get_config(self):
+        '''Fonction de lecture des donnees de configuration
 
-        # La lecture du fichier de configuration, puis des options et enfin des variables d'environnement
-        # permet de definir l'ordre de preference des donnees si les donnees sont fournies sous differentes formes
+           La lecture du fichier de configuration, puis des options et
+           enfin des variables d'environnement
+           permet de definir l'ordre de preference des donnees si les
+           donnees sont fournies sous differentes formes
+        '''
 
-        # Verification de l'existence du repertoire de configuration
         if not os.path.exists(CFG_PATH):
-            # Creation du repertoire si inexistant
             os.mkdir(CFG_PATH)
-            # Verification apres creation afin de valider le systeme
+            # Check to ensure we do have the rights to create / write
             if not os.path.exists(CFG_PATH):
-                self.debug(0, 'Impossible to create configuration file '
-                           + CFG_PATH)
+                self.debug(0, 'Cannot create config directory' + CFG_PATH)
                 sys.exit(2)
 
         # Check that CFG_PATH is a directory and not a file
@@ -643,9 +641,10 @@ class NotebookTomtom:
                 file_ttgobif = os.path.join('/tmp/vfs', 'CurrentMap.dat')
         else:
             self.mount = str(self.mount)
-            file_ttgobif = os.path.join(self.mount, 'CurrentMap.dat')  # -->  /media/cle usb 4g/ttgo.bif [OK]
+            file_ttgobif = os.path.join(self.mount, 'CurrentMap.dat')
+            # -->  /media/cle usb 4g/ttgo.bif [OK]
 
-        print str(file_ttgobif)
+        #print str(file_ttgobif)
 
         if os.path.exists(str(file_ttgobif)):
             with open(file_ttgobif, 'rb') as ttgobif:
@@ -668,24 +667,27 @@ class NotebookTomtom:
             self.box_init = 0
             # self.Popup( _( "Connect your device and restart " ) + App )
 
-        # Validation des possibilites de l'application (verification des dependances externes)
-        # Lancement de la commande which cabextract qui precise l'emplacement de cabextract, renvoi 0 si trouve, 1 sinon
+        # Validation des possibilites de l'application (verification
+        # des dependances externes)
+        # Lancement de la commande which cabextract qui precise
+        # l'emplacement de cabextract, renvoi 0 si trouve, 1 sinon
         p = subprocess.Popen('which cabextract > /dev/null', shell=True)
         if p.wait() != 0:
             self.debug(1, 'cabextract is not installed')
             self.could_gps_fix = False
 
-        # Lancement de la commande which tar qui precise l'emplacement de cabextract, renvoi 0 si trouve, 1 sinon
+        # Lancement de la commande which tar qui precise l'emplacement
+        # de cabextract, renvoi 0 si trouve, 1 sinon
         p = subprocess.Popen('which tar > /dev/null', shell=True)
         if p.wait() != 0:
             self.debug(1, 'tar is not installed')
             self.could_backup = False
 
-        # Affichage des informations de deboggage
+        # Print some debug info
         self.debug(1, 'Application: ' + APP + ' - Version: ' + VER)
         self.debug(1, 'Mounting point used: ' + str(self.mount))
         self.debug(1, 'Model used: ' + str(self.model))
-        self.debug(1, 'Curent map: ' + str(self.current_map))
+        self.debug(1, 'Current map: ' + str(self.current_map))
 
 
     def put_config(self):
@@ -728,11 +730,9 @@ class NotebookTomtom:
         self.popup(_('Reload ') + APP + _(' to use this settings.'))
 
 
-    # ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
     # Fonction de recherche des points de montage disponibles
     def get_pt_mounts(self):
 
-        # Mise a zero de la liste
         self.pt_mounts = []
         # Recuperation de la liste des points de montage de type vfat, avec leur taille
         pt_mounts = self.get_pt_with_size('vfat')
@@ -746,12 +746,10 @@ class NotebookTomtom:
             if self.is_pt_mount(mount):
                 self.pt_mounts.append([pt_mount_size, mount])
 
-        # Affichage des informations de deboggage
-        self.debug(5, 'List of mounting points ' + str(self.pt_mounts))  # 5
+        self.debug(5, 'List of mounting points ' + str(self.pt_mounts))
 
         return True
 
-    # ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
     # Fonction de validation du point de montage
     def is_pt_mount(self, mount_point):
 
@@ -759,7 +757,8 @@ class NotebookTomtom:
         if mount_point == False:
             return False
 
-        # Verification de l'existence du fichier tomtom.ico pour valider qu'il s'agit bien d'un point de montage d'un tomtom
+        # Verification de l'existence du fichier tomtom.ico pour valider
+        # qu'il s'agit bien d'un point de montage d'un tomtom
         self.debug(6, 'Testing mounting point ' + mount_point)
         if os.path.exists(mount_point + self.ttgo):
             self.debug(5, 'Valid mounting point: ' + mount_point)
@@ -771,7 +770,6 @@ class NotebookTomtom:
         # print "test : ERROR : not a tomtom"
         return False
 
-    # ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
     # Fonction demontage
     def umount(self, mount_point):
         cmd = "umount '" + self.mount + "'"
@@ -780,8 +778,8 @@ class NotebookTomtom:
         # self.btnUnmount.set_sensitive( False )
         return True
 
-    # ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-    # fonction GPSQUICKFIX, mise a jour des donnees de l'emplacement des satellites (a effectuer une fois par semaine)
+    # fonction GPSQUICKFIX, mise a jour des donnees de l'emplacement des
+    # satellites (a effectuer une fois par semaine)
     def gps_quick_fix(self, widget):
         print 'starting GpsQuickFix...'
 
@@ -810,19 +808,18 @@ class NotebookTomtom:
             p = subprocess.Popen(cmd, shell=True)
             p.wait()
 
-        if self.model in self.si_rfstar_iii:  # si le tomtom possede un chipset SiRFStarIII
+        # Check if the tomtom device is using a SiRFStarIII chipset
+        if self.model in self.sirfstarIII:
             url = \
                 'http://home.tomtom.com/download/Ephemeris.cab?type=ephemeris&amp;eeProvider=SiRFStarIII&amp;devicecode=2'
             self.debug(6, 'chipset SiRFStarIII : ' + url)
         else:
-              # sinon (si le tomtom possede un chipset globalLocate)
+            # Otherwise this is a globalLocate chipset
             url = \
                 'http://home.tomtom.com/download/Ephemeris.cab?type=ephemeris&amp;eeProvider=globalLocate&amp;devicecode=1'
             self.debug(6, 'chipset globalLocate : ' + url)
 
-        # Definition d'une requete
         request = urllib2.Request(url, None)
-        # Ouverture de la requete
         try:
             # Si l'on veut l'execution, on lance la recuperation de l'url
             if self.no_exec == False:
@@ -831,8 +828,10 @@ class NotebookTomtom:
             self.debug(1, 'Impossible to fetch URL: ' + url)
             return False
 
-        # Autant de try imbrique afin de fournir des messages justes, et de supprimer correctement les fichiers et dossiers temporaires
-        # Le cab est recupere dans un fichier temporaire, puis extrait dans un dossier temporaire
+        # Autant de try imbrique afin de fournir des messages justes,
+        # et de supprimer correctement les fichiers et dossiers temporaires
+        # Le cab est recupere dans un fichier temporaire, puis extrait
+        # dans un dossier temporaire
         try:
             # Creation d'un repertoire temporaire pour extraire le cab telecharge
             temp_dir_name = tempfile.mkdtemp()
@@ -909,17 +908,23 @@ class NotebookTomtom:
 
         '''
 
-        # Ecriture de la commande, df pour lister,
+        # Use df command,
         #     -t pour specifier le type selectionne,
         #     -T pour afficher le type du systeme de fichier
         #     -l pour lister uniquement les systemes de fichiers locaux
         #     -P pour avoir le format posix
         #     --output-delimiter pour s'assurer le delimiteur final avant traitement (commande split)
         #     -B 1 pour utiliser une taille de 1 octet pour l'affichage
-        #     Si la commande ne liste aucun systeme de fichier, un message d'erreur est fourni, on re-dirige donc les erreurs sur /dev/null
-        #     La commande df affiche une entete inutile, d'ou le tail -n +2 (on commence a la deuxieme ligne)
-        #     Afin de pouvoir decouper facilement la ligne, on remplace les ensembles d'espace par un unique espace - commande tr -s
-        #     Afin de ne retenir que les donnees utiles, on recupere les champs 4 et 7 - commande cut
+        #
+        # Si la commande ne liste aucun systeme de fichier, un message
+        # d'erreur est fourni, on re-dirige donc les erreurs sur /dev/null
+        # La commande df affiche une entete inutile, d'ou le tail -n +2
+        # (on commence a la deuxieme ligne)
+        # Afin de pouvoir decouper facilement la ligne, on remplace les
+        # ensembles d'espace par un unique espace - commande tr -s
+        # Afin de ne retenir que les donnees utiles, on recupere les
+        # champs 4 et 7 - commande cut
+        #
         cmd = 'df -B 1 -TlP'
         if not type == None:
             cmd += 't ' + type + ' '
@@ -928,7 +933,8 @@ class NotebookTomtom:
         # cmd += " 2> /dev/null | tail -n +2 | tr -s ' ' | cut -d ' ' -f 4,7 --output-delimiter=,"
         cmd += " 2> /dev/null | tail -n +2 | tr -s ' ' | cut -d ' ' -f 4,7-"
 
-        # Lancement de la commande, avec recuperation du stdout dans le processus actuel
+        # Lancement de la commande, avec recuperation du stdout dans le
+        # processus actuel
         self.debug(5, 'launching command: ' + cmd)  # 5
         p = subprocess.Popen(cmd, stdout=subprocess.PIPE, shell=True)
         res = []
@@ -944,14 +950,15 @@ class NotebookTomtom:
         p.wait()
 
         if res == []:
-            # le resultat de la fonction est une liste de liste contenant la taille et le nom du point de montage
+            # le resultat de la fonction est une liste de liste contenant
+            # la taille et le nom du point de montage
             return [[-1, None]]
 
         # Renvoi des donnees collectees
         return res
 
-    # ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-    # Fonction de recherche d'un enfant de self.window, le nom fourni sous la forme nom_frame.nom_box.... 7
+    # Fonction de recherche d'un enfant de self.window, le nom fourni
+    # sous la forme nom_frame.nom_box.... 7
     def search_obj(self, name):
 
         # TODO : existe-t-il deja une fonction plus rapide ?
@@ -988,7 +995,6 @@ class NotebookTomtom:
         # retour de l'enfant, comme le parent est devenu l'enfant, il suffit de retourner le parent (on est sur qu'il est defini)
         return obj_parent
 
-    # ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
     # fonction de remplacement image de demarrage avec toutes les verifications utiles
     def change_start_img(self, widget):
 
@@ -1002,7 +1008,6 @@ class NotebookTomtom:
 
                 # subprocess.call( [ "convert image.jpg -resize 480x272 -background black -gravity center -extent 480x272 splash.bmp" ], shell = True )
 
-    # ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
     # Fonction de creation d'un nom de fichier de sauvegarde
     def get_new_file_name(self, uniq=False):
 
@@ -1014,7 +1019,6 @@ class NotebookTomtom:
             return BACKUP_PATH + '/sv' + str(random.randint(1, 50)) + '-' \
                 + str(date.today()) + '-' + self.model + '.tar'
 
-    # ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
     # fonction de lancement du Backup et de la restauration avec toutes les verifications utiles
     def backup_restore_gps(self, widget, type):
 
@@ -1136,7 +1140,6 @@ class NotebookTomtom:
 
         return True
 
-    # ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
     # Fonction de calcul et de mise en forme des temps estimes restant, total et du temps passe
     def get_time_delay(self, percent):
 
@@ -1186,7 +1189,6 @@ class NotebookTomtom:
         # Renvoi du texte a afficher
         return time_to_print
 
-    # ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
     # fonction de validation du processus apres sa fin
     def _backup_restore_gpsend(self, type):
 
@@ -1217,7 +1219,6 @@ class NotebookTomtom:
 
         return True
 
-    # ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
     # Fonction d'affichage de la barre de progression
     def progress(
         self,
@@ -1337,7 +1338,6 @@ class NotebookTomtom:
         # Pour continuer la barre de progression, il faut renvoyer la valeur True
         return True
 
-    # ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
     # Fonction pour quitter l'application
     def delete(self, widget, event=None):
 
@@ -1367,14 +1367,8 @@ class NotebookTomtom:
 
         return True
 
-    # ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
     # Fonction de creation et d'affichage d'un onglet
-    def create_custom_tab(
-        self,
-        text,
-        notebook,
-        frame,
-        ):
+    def create_custom_tab(self, text, notebook, frame):
 
         # On crée une eventbox
         event_box = gtk.EventBox()
@@ -1394,21 +1388,17 @@ class NotebookTomtom:
 
         return event_box
 
-    # ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-    # Fonction d'affichage d'un popup
     def popup(self, text):
+        '''Show a popup
+        '''
 
-        # Creation d'un popup
         dialog = gtk.MessageDialog(None, gtk.DIALOG_MODAL, gtk.MESSAGE_INFO,
                                    gtk.BUTTONS_OK, text)
-        # Affichage du popup
         dialog.run()
-        # Suppression du popup
         dialog.destroy()
 
         return True
 
-    # ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
     # Fonction d'affichage et de mise a jour du combo des points de montage
     def make_combo(self):
 
@@ -1460,8 +1450,8 @@ class NotebookTomtom:
 
         return True
 
-    # ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-    # Fonction de mise a jour de la variable associee a chaque case a cocher pour l'affichage des temps restant, total, passe
+    # Fonction de mise a jour de la variable associee a chaque case a
+    # cocher pour l'affichage des temps restant, total, passe
     def update_config_time(self, widget):
 
         # Recuperation du nom de la case a cocher
@@ -1471,9 +1461,7 @@ class NotebookTomtom:
 
         return True
 
-    # ------------------------------------------ DEFINITION DES FONCTIONS D'AFFICHAGE ----------------------------------------
-    # ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-    # Fonction de creation de la frame des options
+
     def frame_option(self, notebook):
 
         # --------------------------------------
@@ -1511,22 +1499,16 @@ class NotebookTomtom:
         label.set_justify(gtk.JUSTIFY_CENTER)
         tab_box_right.pack_start(label, True, False, 2)
 
-        # bouton parcourir
-#        p = gtk.Button( _( "Sélectionner le point de montage du TomTom..." ) )
-#      tabBox.pack_start( p, True, False, 2 )
-#        p.connect( "clicked", self.parcourir_gps )
-
-        # Liste des points de montage possibles
+        # List potential TOMTOM mount point
         self.make_combo()
         tab_box_right.pack_start(self.pt_combo, True, False, 0)
-        # Lancement de la mise a jour automatiquement toutes les 2 secondes
+        # Start automatic update every 2 secondes
         self.tempo_combo = gobject.timeout_add(2000, self.make_combo)
 
-        # separator
         hs = gtk.HSeparator()
         tab_box_right.pack_start(hs, False, False, 2)
 
-        # Liste des modeles
+        # Model list
         self.modele_combo = gtk.combo_box_new_text()
         i = 0
         for text in self.models:
@@ -1583,8 +1565,7 @@ class NotebookTomtom:
 
         return True
 
-    # ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-    # Fonction de creation de la frame du GPSFix
+
     def frame_gpsquick_fix(self, notebook):
 
         # --------------------------------------
@@ -1649,8 +1630,7 @@ in the options.'''))
 
         return True
 
-    # ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-    # Fonction de creation de la frame de lancement du backup et de la restauration
+
     def frame_backup_restore(self, notebook):
 
         # ---------------------------------------------------------------------
@@ -1817,8 +1797,6 @@ For information, 25 minutes and 1GB on disk for a One Series 30'''))
 
         return True
 
-    # ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-    # Fonction de creation de la frame POI
     def frame_poi(self, notebook):
 
         # --------------------------------------
@@ -1921,8 +1899,7 @@ For information, 25 minutes and 1GB on disk for a One Series 30'''))
 
         return True
 
-    # ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-    # Fonction de creation de la frame PERSONNALISER
+
     def frame_personalize(self, notebook):
 
         # --------------------------------------
@@ -1972,7 +1949,6 @@ For information, 25 minutes and 1GB on disk for a One Series 30'''))
 
         return True
 
-    # ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
     # Fonction de creation de la frame a propos
     def frame_about(self, notebook):
 
@@ -2017,7 +1993,6 @@ For information, 25 minutes and 1GB on disk for a One Series 30'''))
 
         return True
 
-    # ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
     # Fonction de creation de la frame quit
     def frame_quit(self, notebook):
 
@@ -2074,7 +2049,6 @@ For information, 25 minutes and 1GB on disk for a One Series 30'''))
 
         return True
 
-    # ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
     # fonction parcourir pour selectionner un dossier / conservation en cas de besoin def parcourir_gps( self,entry ):
     def select_folder(self, entry):
 
@@ -2091,7 +2065,6 @@ For information, 25 minutes and 1GB on disk for a One Series 30'''))
 
         return True
 
-    # ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
     # fonction parcourir pour selectionner un fichier gtk.FILE_CHOOSER_ACTION_OPEN
     def select_img(self, entry):
 
@@ -2138,7 +2111,6 @@ For information, 25 minutes and 1GB on disk for a One Series 30'''))
 
         return True
 
-    # ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
     # fonction parcourir pour selectionner un fichier gtk.FILE_CHOOSER_ACTION_OPEN
     def add_poi_to_database(self, entry):
 
@@ -2179,7 +2151,6 @@ For information, 25 minutes and 1GB on disk for a One Series 30'''))
 
         return True
 
-    # ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
     # fonction copie du poi sur le tomtom
     def add_poi_to_tomtom(self, entry):
 
@@ -2192,7 +2163,6 @@ For information, 25 minutes and 1GB on disk for a One Series 30'''))
 
         return True
 
-    # ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
     # fonction suppression du poi sur le tomtom
     def del_poi_on_tomtom(self, entry):
 
@@ -2208,7 +2178,6 @@ For information, 25 minutes and 1GB on disk for a One Series 30'''))
 
         return True
 
-    # ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
     # fonction suppression du poi sur le tomtom
     def del_poi_from_database(self, entry):
         # on supprime  les fichiers
@@ -2225,21 +2194,7 @@ For information, 25 minutes and 1GB on disk for a One Series 30'''))
 
         return True
 
-    # ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-    # fonction test en fond de tache   NON UTILISEE
-    def ma_fonction(self):
-        # print "toto"
-        if self.pt_mount != False:
-            gps_status = 'connected'
-            print gps_status
-        else:
-            gps_status = 'disconnected'
-        # while True:
-            # self.ma_fonction()
-        return True
 
-    # ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-    # Fonction de demarrage de la classe
     def __init__(self):
 
         # Convert old pyTOMTOM path into pytomtom (=<0.4.2)
@@ -2248,30 +2203,28 @@ For information, 25 minutes and 1GB on disk for a One Series 30'''))
         # Read configuration
         self.get_config()
 
-        # Si on est pas en mode script
+        # Non script mode (GUI)
         if self.no_gui == False:
-            # On cree la fenetre principale
+            # Create main window
             self.window = gtk.Window(gtk.WINDOW_TOPLEVEL)
-            # En cas de fermeture de la fenetre, on appel la fonction Delete
+            # Call fonction Delete in case of window's closure
             self.window.connect('delete_event', self.delete)
             self.window.set_border_width(10)
             self.window.set_title(APP)
             self.window.set_icon_from_file(PIX_PATH + 'icon.png')
-            # centrage de la fenetre
+            # Center window
             self.window.set_position(gtk.WIN_POS_CENTER)
             # timeout for tooltips
             settings = self.window.get_settings()
             settings.set_property('gtk-tooltip-timeout', 0)
 
-            # *************************************************************************************************************
-            # On cree un nouveau notebook
+            # Create new notebook object
             notebook = gtk.Notebook()
             notebook.set_name('notebook')
             self.window.add(notebook)
             notebook.show()
 
-            # *************************************************************************************************************
-            # Construction des onglets de la fenetre principale
+            # Build tabs
             self.frame_option(notebook)
             if self.box_init != 0:
                 self.frame_gpsquick_fix(notebook)
@@ -2281,29 +2234,27 @@ For information, 25 minutes and 1GB on disk for a One Series 30'''))
             self.frame_about(notebook)
             self.frame_quit(notebook)
 
-            # *************************************************************************************************************
-            # Onglet que nous verrons à l'ouverture
+            # Default tab at startup
             notebook.set_current_page(self.box_init)
-            # Affichage de l'ensemble
             self.window.show_all()
 
-        # Lancement des actions
+        # Execute actions if the options are selected
 
-        # Si l'option a ete fournie, lancement de la sauvegarde de la configuration
+        # Save configuration
         if self.do_save:
             self.put_config()
 
-        # Si l'option a ete fournie, lancement du GpsFix
+        # Download GPSQuickFix
         if self.do_gps_fix:
             self.debug(1, 'Starting GPSQuickFix')
             self.gps_quick_fix(None)
 
-        # Si l'option a ete fournie, lancement du Backup
+        # Start backup
         if self.do_backup:
             self.debug(1, 'Starting Backup')
             self.backup_restore_gps(None, 'backup')
 
-        # Si l'option a ete fournie, lancement de la restauration
+        # Start restore
         if self.do_restore:
             self.debug(1, 'Starting Restore')
 
@@ -2321,11 +2272,10 @@ For information, 25 minutes and 1GB on disk for a One Series 30'''))
 
 
 def main():
+    NotebookTomtom()
     gtk.main()
-    return 0
 
 
 # Entry point if not imported as module
 if __name__ == '__main__':
-    NotebookTomtom()
     main()
