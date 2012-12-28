@@ -1,73 +1,46 @@
 #!/usr/bin/python
 # -*- coding: utf-8 -*-
-# /usr/bin/python
 
-# ----------------------------------------------- APPLICATION HEADER DEFINITION ---------------------------------------
-# pyTOMTOM - Manage your TomTom !
-# http://pytomtom.tuxfamily.org
-# dev : Thomas LEROY
-# sorry for my bad english in comments...
-# python (>=2.5), python-gtk2, cabextract,  ImageMagick
+'''
+pyTOMTOM - Manage your TomTom!
+http://pytomtom.tuxfamily.org
 
-#
-# ----------------------------------------------- DEVELOPPEMENT RULES DEFINITION --------------------------------------
-# developpement rules
-# - Utilisation de la langue anglaise pour le nom des variables et des fonctions (pas de melange)
-# - Les noms des fonctions commencent par une majuscule, avec une majuscule a chaque nouveau mot
-# ( - les noms de fonctions commencent par une majuscule avec _ pour separer les mots )
-# - Les variables commencent par une minuscule, avec une majuscule a chaque nouveau mot
-# ( - pas de distinction entre le nom d'une variable et le nom d'une fonction )
-# - Les fonctions ont toujours une entete definissant l'utilite de la fonction, ...
-# - Le nom d'une classe s'ecrit comme le nom d'une fonction
-# - tous les textes s'utilisent avec la fonction _() afin de rendre l'application internationnale
-# - tout code ecrit deux fois est mis dans une fonction, jamais copie
-# - tous les commentaires ne sont pas ecrits avec des accents (internationalisation de l'application)
-# - pas d'espace avant (, mais un espace apres
-# - un espace avant ), mais pas d'espace apres
-# - pas d'espace avant : qui demarre un ensemble
-# - un espace avant et un apres + (concatenation de chaine)
-# - un espace apres une virgule
-# - les fonctions internes commencent par _
-#
+Copyright (c) 2009-2011: Thomas LEROY
 
-# ---------------------------------------------------- LIBRARIES IMPORT ---------------------------------------------------------
-# used to be compatible python 2.5 (with)
+Licence:
+  GPL v3
+
+Depends:
+  python (>=2.5), python-gtk2, cabextract, ImageMagick
+
+Follow PEP 8: Style Guide for Python
+  http://www.python.org/dev/peps/pep-0008
+'''
+
+# Ensure Python 2.5 compatibility
 from __future__ import with_statement
-# TODO : needed ? import pygtk
+
 import gtk
-# used to fetch cab for GPSQuickFix
 import urllib2
-# used to visit homepage in webbrowser
 import webbrowser
-# used to launch subprocess (tar, cabextract, df, ...)
 import subprocess
-# used to copy files and delete directory
 import shutil
-# used to get environment variables and operation for folder and files
 import os
-# used to get informations about files and directory
 import os.path
-# used to get date
-from datetime import date
-# used to get options (arg)
 import getopt
-# used to use systems
 import sys
-# used to translate text
 import gettext
-# used to create temp directory or file
 import tempfile
-# used to create timeout
 import gobject
-# used to create new backup file with random number
 import random
-# used to get terminal witdh
+
+# Used to get terminal width
 import termios
 import fcntl
 import struct
 
-# ----------------------------------------------- GLOBAL DEFINITION  ---------------------------------------------------------
-# name,  version and homepage
+from datetime import date
+
 APP = 'pyTOMTOM'
 VER = '0.6 alpha 1'
 WEB_URL = 'http://pytomtom.tuxfamily.org'
@@ -77,24 +50,20 @@ gettext.bindtextdomain('pytomtom', '../share/locale')
 gettext.textdomain('pytomtom')
 _ = gettext.gettext
 
-# TODO : en mode texte non lance par un terminal, un message d'erreur arrive, il n'empeche pas le lancement
-# du logiciel ni ses actions, mais il serait plus propre de ne pas l'avoir
-#
-# ----------------------------------------------- VERIFICATIONS DES PRE-REQUIS ------------------------------------------------
-# Verify to running Linux - posix system
+# TODO: In non-text mode launched from a terminal, an error message
+# happens. It does not prevent to launch the application nor its
+# functionalities, but it would be cleaner do avoid it.
+# BC: Need more details about that issue in order to fix it.
+
+# Only Linux is supported so far, so exit if the OS is not posix
+# compliant
 if os.name != 'posix':
     print 'You are not runnig Linux operating system'
     sys.exit(2)
 
 
-# TODO : needed ? Verify python  >=2.0
-# pygtk.require('2.0')
-
-# ----------------------------------------------- DEFINITION DE LA CLASSE PRINCIPALE ------------------------------------------
-
 class NotebookTomtom:
 
-    # ------------------------------------------ DEFINITION DES VARIABLES GLOBALES -------------------------------------------
     # config directory
     dir = os.getenv('HOME') + '/.' + APP
     # config file
@@ -240,13 +209,11 @@ class NotebookTomtom:
     # objet graphique de la liste des points de montage
     pt_combo = None
 
-    # ------------------------------------------ DEFINITION DES FONCTIONS DE LA CLASSE ---------------------------------------
-    #
 
-    # ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-    # Fonction d'affichage des informations
     def debug(self, niveau, text):
+        '''Fonction d'affichage des informations
 
+        '''
         # Affichage uniquement si le niveau general de debug est superieur au niveau du debug fourni
         if niveau <= self.log_level:
             # Ecriture dans le fichier de log
@@ -255,18 +222,20 @@ class NotebookTomtom:
             self.log_file.flush()
         return True
 
-    # ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-    # Fonction d'affichage du nom et de la version de l'application
     def print_version(self):
+        ''' Fonction d'affichage du nom et de la version de l'application
+
+        '''
 
         print ''
         print APP
         print VER
 
-    # ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-    # conversion pyTOMTOM to pytomtom (=< 0.4.2 to 0.5)
-    # later, we'll suppress this... (or not)
     def recup(self):
+        '''conversion pyTOMTOM to pytomtom (=< 0.4.2 to 0.5)
+           later, we'll suppress this... (or not)
+
+        '''
 
         # old config directory
         old_dir = os.getenv('HOME') + '/.pyTOMTOM'
@@ -279,9 +248,8 @@ class NotebookTomtom:
                 # move to new config directory
                 shutil.move(old_dir + '/' + file, self.dir + '/' + file)
 
-    # ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-    # what's the latest pytomtom release ?
     def latest_release(self, widget):
+        '''What is the latest pytomtom release?'''
 
         try:
             url = 'http://tomonweb.2kool4u.net/pytomtom/LATEST'
@@ -306,16 +274,14 @@ class NotebookTomtom:
             msg = _('Impossible to fetch data')
             self.popup(msg)
 
-    # ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-    # open pytomtom homepage in browser
     def web_connect(self, widget):
+        '''open pytomtom homepage in browser'''
 
         webbrowser.open(WEB_URL)
         return True
 
-    # ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-    # Fonction d'affichage de l'utilisation des options
     def usage(self):
+        '''Fonction d'affichage de l'utilisation des options'''
 
         # Utilisation de sysr.argv[ 0 ] afin d'avoir toujours le bon nom de l'executable
         print ''
@@ -2310,6 +2276,7 @@ For information, 25 minutes and 1GB on disk for a One Series 30'''))
             notebook.set_name('notebook')
             self.window.add(notebook)
             notebook.show()
+
             # *************************************************************************************************************
             # Construction des onglets de la fenetre principale
             self.frame_option(notebook)
@@ -2320,6 +2287,7 @@ For information, 25 minutes and 1GB on disk for a One Series 30'''))
                 self.frame_personalize(notebook)
             self.frame_about(notebook)
             self.frame_quit(notebook)
+
             # *************************************************************************************************************
             # Onglet que nous verrons à l'ouverture
             notebook.set_current_page(self.box_init)
@@ -2359,14 +2327,12 @@ For information, 25 minutes and 1GB on disk for a One Series 30'''))
         return None
 
 
-# ----------------------------------------------- DEFINITION DES FONCTIONS GLOBALES -------------------------------------------
-
 def main():
     gtk.main()
     return 0
 
 
-# ----------------------------------------------- LAUNCHING APPLICATION --------------------------------------------------
+# Entry point if not imported as module
 if __name__ == '__main__':
     NotebookTomtom()
     main()
