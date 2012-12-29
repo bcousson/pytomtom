@@ -233,6 +233,15 @@ class NotebookTomtom:
     # objet graphique de la liste des points de montage
     pt_combo = None
 
+    # Config entries used old (version < 0.6) variables names
+    # Use a dict to map the old name to the attributes
+    configs = {
+        'ptMount':'mount',
+        'model':'model', # Not needed in theory since unchanged
+        'configTimePassed':'config_time_passed',
+        'configTimeRemind':'config_time_remind',
+        'configTimeTot':'config_time_tot',
+        }
 
     def debug(self, niveau, text):
         '''Fonction d'affichage des informations
@@ -576,45 +585,35 @@ class NotebookTomtom:
                 self.debug(0, 'Impossible to create configuration file '
                            + CFG_PATH)
                 sys.exit(2)
-        else:
-            # Verification que le dossier de configuration en est bien un
-            # TODO : verification en cas de lien vers un dossier plutot qu'un dossier
-            if os.path.isdir(CFG_PATH):
-                # Verification de l'existence du fichier de configuration
-                if os.path.exists(CFG_PATH + '/' + CFG_FILE):
-                    # Ouverture du fichier de configuration en lecture
-                    with open(CFG_PATH + '/' + CFG_FILE, 'rb') as \
-                        config:
-                        # Lecture des lignes
-                        line = config.readline()
-                        while line:
-                            # suppression des \n de fin de ligne
-                            line = line[:-1]
-                            # Le fichier se presente sous la forme nom=valeur, on decoupe selon le =
-                            line = line.split('=')
-                            # Suppression des espaces inutiles en debut et fin de mot
-                            name = line[0].strip()
-                            # On traite en deux cas, soit le parametre est un string, soit un bouleen
-                            if name in ('ptMount', 'model'):
-                                # setattr permet d'associer la valeur a l'attribut fourni par son nom au format str
-                                # On supprime naturellement les espaces inutiles en debut et fin de mot
-                                setattr(self, name, line[1].strip())
-                            elif name in ('configTimePassed', 'configTimeRemind'
-                                    , 'configTimeTot'):
-                            #      deuxieme cas, s'il s'agit d'un bouleen
-                                if line[1].strip() == 'True':
-                                    setattr(self, name, True)
-                                else:
-                                    setattr(self, name, False)
 
-                            # lecture de la prochaine ligne
-                            line = config.readline()
-                    # Fermeture du fichier de configuration
-                    config.close()
-            else:
-                self.debug(0, 'Configuration path is not a directory '
-                           + CFG_PATH)
-                sys.exit(2)
+        # Check that CFG_PATH is a directory and not a file
+        # TODO: Check the link case
+        if not os.path.isdir(CFG_PATH):
+            self.debug(0, 'Configuration path is not a directory ' + CFG_PATH)
+            sys.exit(2)
+
+        if os.path.exists(CFG_PATH + '/' + CFG_FILE):
+            with open(CFG_PATH + '/' + CFG_FILE, 'rb') as config:
+                for line in config:
+                    line = line.rstrip()
+                    # File format is name=value
+                    line = line.split('=')
+                    name = line[0].strip()
+                    attr = self.configs.get(name, name)
+
+                    # Create object attributes using config name
+                    if name in ('ptMount', 'model'):
+                        setattr(self, attr, line[1].strip())
+                    elif name in ('configTimePassed',
+                                  'configTimeRemind',
+                                  'configTimeTot'):
+                        # Handle boolean values
+                        if line[1].strip() == 'True':
+                            setattr(self, attr, True)
+                        else:
+                            setattr(self, attr, False)
+
+                    self.debug(1, 'Load cfg: %s=%s' % (attr, line[1].strip()))
 
         # Lecture de la carte utilisee
 
@@ -688,58 +687,46 @@ class NotebookTomtom:
         self.debug(1, 'Model used: ' + str(self.model))
         self.debug(1, 'Curent map: ' + str(self.current_map))
 
-        return True
 
-    # ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-    # Fonction de mise a jour et d'enregistrement des options par le formulaire
+    def put_config(self):
+        '''Save the options in config file
+        '''
+
+        if not (self.mount and self.model):
+            self.debug(0, "Cannot write data: mounting point = '%s'"
+                          " - model = '%s'" % (str(self.mount), str(self.model)))
+            sys.exit(2)
+
+        # Create the (value, key) dict for reverse mapping
+        configs = dict((v, k) for k, v in self.configs.iteritems())
+
+        with open(CFG_PATH + '/' + CFG_FILE, 'wb') as config_file:
+            # Save in format name=value
+            for option in configs:
+                name = configs.get(option, option)
+                config_file.write(name + '=' + str(getattr(self, option)) + '\n')
+                self.debug(1, 'Save: %s=%s' % (name, getattr(self, option)))
+
+
     def on_update(self, entry):
+        '''Update options from GUI tab
+        '''
 
-        # Recuperation des differents parametres du formulaire
         model = self.modele_combo.get_model()
         index = self.modele_combo.get_active()
+
+        # No check require, since the list is not user editable
         self.model = str(model[index][0])
-        # Pas de verification du modele puisque le choix s'effectue a partir d'une liste fournie par l'application, aucun risque d'erreur
 
         mount = self.pt_combo.get_model()
         index = self.pt_combo.get_active()
         if self.is_pt_mount(str(mount[index][0])):
             self.mount = str(mount[index][0])
 
-        # Enregistrment des options
+        # Save options
         self.put_config()
         self.popup(_('Reload ') + APP + _(' to use this settings.'))
 
-        return True
-
-    # ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-    # Fonction de sauvegarde de la configuration
-    def put_config(self):
-
-        # Verification des donnees a sauvegarder
-        if not (self.mount and self.model):
-            self.debug(0, 'Cannot write data: ' + "mounting point = '"
-                       + str(self.mount) + "' - model = '" + str(self.model)
-                       + "'")
-            sys.exit(2)
-
-        # Sauvegarde des donnees dans le fichier de configuration
-        try:
-            config_file = open(CFG_PATH + '/' + CFG_FILE, 'wb')
-            # L'enregistrement des options s'effectue sous le forme nom=valeur
-            # getattr permet de recuperr la valeur de l'attribut fourni par son nom au format str
-            for option in ('ptMount', 'model', 'configTimePassed',
-                           'configTimeRemind', 'configTimeTot'):
-                config_file.write(option + '=' + str(getattr(self, option))
-                                  + '\n')
-        finally:
-            # Fermeture du fichier, qu'il y ait une erreur ou non
-            config_file.close()
-
-        # Affichage des informations de deboggage
-        self.debug(1, 'TomTom: ' + str(self.model) + ' ::saved::')
-        self.debug(1, 'Mounting point: ' + str(self.mount) + ' ::saved::')
-
-        return True
 
     # ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
     # Fonction de recherche des points de montage disponibles
@@ -1559,7 +1546,7 @@ class NotebookTomtom:
 
         # Case a cocher pour l'affichage du temps passe dans la barre de progression
         button = gtk.CheckButton(_('elapsed time'), False)
-        button.set_name('configTimePassed')
+        button.set_name('config_time_passed')
         button.connect('clicked', self.update_config_time)
         if self.config_time_passed == True:
             button.set_active(True)
@@ -1567,7 +1554,7 @@ class NotebookTomtom:
 
         # Case a cocher pour l'affichage du temps estime restant dans la barre de progression
         button = gtk.CheckButton(_('remaining time'), False)
-        button.set_name('configTimeRemind')
+        button.set_name('config_time_remind')
         button.connect('clicked', self.update_config_time)
         if self.config_time_remind == True:
             button.set_active(True)
@@ -1575,7 +1562,7 @@ class NotebookTomtom:
 
         # Case a cocher pour l'affichage du temps estime total dans la barre de progression
         button = gtk.CheckButton(_('total time'), False)
-        button.set_name('configTimeTot')
+        button.set_name('config_time_tot')
         button.connect('clicked', self.update_config_time)
         if self.config_time_tot == True:
             button.set_active(True)
