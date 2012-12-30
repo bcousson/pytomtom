@@ -33,6 +33,7 @@ import gettext
 import tempfile
 import gobject
 import random
+import time
 
 # Used to get terminal width
 import termios
@@ -750,7 +751,7 @@ class NotebookTomtom:
 
         return True
 
-    # Fonction de validation du point de montage
+
     def is_pt_mount(self, mount_point):
 
         # Si le point de montage n'est pas fourni ou est faux
@@ -763,14 +764,11 @@ class NotebookTomtom:
         if os.path.exists(mount_point + self.ttgo):
             self.debug(5, 'Valid mounting point: ' + mount_point)
             self.gps_status = 'connected'
-            # print "test : ok : tomtom"
             return True
 
-        # Dans tous les autres cas, le point de montage n'est pas valide
-        # print "test : ERROR : not a tomtom"
         return False
 
-    # Fonction demontage
+
     def umount(self, mount_point):
         cmd = "umount '" + self.mount + "'"
         p = subprocess.Popen(cmd, shell=True)
@@ -778,32 +776,72 @@ class NotebookTomtom:
         # self.btnUnmount.set_sensitive( False )
         return True
 
-    # fonction GPSQUICKFIX, mise a jour des donnees de l'emplacement des
-    # satellites (a effectuer une fois par semaine)
-    def gps_quick_fix(self, widget):
-        print 'starting GpsQuickFix...'
 
-        # Si cabextract n'existe pas, on ne fait rien
+    def get_ephem_expiry(self):
+        '''Read GPS quick fix data expiry date
+
+        '''
+
+        d = 'Date unknown'
+
+        # Check for a valid mount point
+        if not self.is_pt_mount(self.mount):
+            self.debug(1, 'Invalid mounting point: ' + self.mount)
+            return d
+
+        ee_meta = os.path.join(self.mount + self.dest, 'ee_meta.txt')
+        if not os.path.exists(ee_meta):
+            self.debug(0, 'Ephem dir (%s) does not exist' % ee_meta)
+            return d
+
+        with open(ee_meta) as ephem:
+            for line in ephem:
+                line = line.rstrip()
+                name, value = line.split('=')
+                if name == 'Expiry':
+                    current = time.time()
+                    expiry = float(value)
+                    self.debug(1, 'Current date: ' + time.asctime(time.localtime(current)))
+                    self.debug(1, 'Expiry date: ' + time.asctime(time.localtime(expiry)))
+                    if current > expiry:
+                        self.debug(1, 'Expired, need update')
+                        return 'Expired (%s)' % time.strftime("%x", time.localtime(expiry))
+                    else:
+                        return time.strftime("%c", time.localtime(expiry))
+
+        return d
+
+
+    def gps_quick_fix(self, widget):
+        '''Download GPS quick fix data
+
+        Download from TOMTOM web site the data file containing
+        satellites position for the next 6 days.
+        '''
+
+        self.debug(0, 'Starting GpsQuickFix...')
+
+        # Without cabextract we cannot do anything
         if self.could_gps_fix == False:
             return False
 
-        # Verification du point de montage
+        # Check for a valid mount point
         if not self.is_pt_mount(self.mount):
             self.debug(1, 'Invalid mounting point: ' + self.mount)
             return False
 
-        # Aucune verification du modele car il provient d'une liste pre-definie
+        # Don't check for model
 
-        # Definition du dossier de destination
+        # Destination directory
         dir = str(self.mount + self.dest)
 
-        # Verification de l'existence du du dossier ephem
+        # Check for /ephem dir on TOMTOM
         self.debug(6, 'Testing ephem directory ' + dir)
         if os.path.exists(dir):
             self.debug(5, 'Valid directory: ' + dir)
         else:
             self.debug(5, 'Creating ephem directory')
-            # on cree le repertoire ephem si il n'existe pas
+            # Create it is not there
             cmd = 'mkdir ' + dir
             p = subprocess.Popen(cmd, shell=True)
             p.wait()
@@ -819,86 +857,98 @@ class NotebookTomtom:
                 'http://home.tomtom.com/download/Ephemeris.cab?type=ephemeris&amp;eeProvider=globalLocate&amp;devicecode=1'
             self.debug(6, 'chipset globalLocate : ' + url)
 
-        request = urllib2.Request(url, None)
         try:
-            # Si l'on veut l'execution, on lance la recuperation de l'url
-            if self.no_exec == False:
-                url_file = urllib2.urlopen(request)
+            # Create temp file for cab file download
+            temp_file = tempfile.NamedTemporaryFile()
         except:
-            self.debug(1, 'Impossible to fetch URL: ' + url)
+            self.debug(0, 'Cannot create temporary file')
             return False
 
-        # Autant de try imbrique afin de fournir des messages justes,
-        # et de supprimer correctement les fichiers et dossiers temporaires
-        # Le cab est recupere dans un fichier temporaire, puis extrait
-        # dans un dossier temporaire
+        # Download and then extract data from cab file into
+        # /ephem dir
         try:
-            # Creation d'un repertoire temporaire pour extraire le cab telecharge
-            temp_dir_name = tempfile.mkdtemp()
-            self.debug(5, 'Creating temporary directory: ' + temp_dir_name)
-            try:
-                # Creation d'un fichier temporaire pour le telechargement du cab
-                temp_file = tempfile.NamedTemporaryFile()
-                self.debug(5, 'Creating temporary file: ' + temp_file.name)
-                try:
-                    self.debug(5, 'Fetching data: ' + url)
-                    # Si l'on veut une execution, on telecharge le cab
-                    if self.no_exec == False:
-                        temp_file.write(url_file.read())
-                        temp_file.flush()
-                        url_file.close()
-                    try:
-                        # Extraction du cab seulement si l'on veut l'execution, sinon un simple affichage de ce que l'on aurait fait
-                        if self.no_exec == False:
-                            cmd = 'cabextract -d ' + temp_dir_name + ' ' \
-                                + temp_file.name + '; touch ' + temp_dir_name \
-                                + '/*'
-                        else:
-                            cmd = 'echo cabextract -d ' + temp_dir_name + ' ' \
-                                + temp_file.name + '; echo touch ' \
-                                + temp_dir_name + '/*'
-                        self.debug(5, 'Launching command ' + cmd)
-                        # Lancement du processus
-                        p = subprocess.Popen(cmd, shell=True)
-                        p.wait()
-                        try:
-                            # Deplacement de tous les fichiers du cab vers la destination
-                            #     Ceci evite de faire une difference entre les deux modeles de chipset
-                            files = os.listdir(temp_dir_name)
-                            for file in files:
-                                self.debug(5,
-                                        'Moving file to final destination: '
-                                        + temp_dir_name + '/' + file + ' -> '
-                                        + self.mount + self.dest + '/'
-                                        + file)
-                                # ATTENTION : si le fichier destination est un repertoire, et que le fichier existe
-                                #             shutil.move fait une erreur, il faut donc preciser le fichier de destination
-                                #             pour l'ecraser, et non simplement le repertoire de destination
-                                shutil.move(temp_dir_name + '/' + file,
-                                        self.mount + self.dest + '/' + file)
-                        except:
-                            self.debug(0, 'Impossible to move data')
-                    except:
-                        self.debug(0, 'Impossible to extract data')
-                except:
-                    self.debug(0, 'Impossible to fetch data')
-            except:
-                self.debug(0, 'Impossible to create temporary file')
-            finally:
-                # Fermeture propre du fichier temporaire (avec sa suppression) dans tous les cas (meme si un probleme survient)
-                temp_file.close()
-        except:
-            self.debug(0, 'Impossible to create temporary directory')
-        finally:
-            # Suppression du dossier temporaire dans toça c'est la dernière, supprime tout le reste...us les cas (meme si un probleme survient)
-            shutil.rmtree(temp_dir_name)
+            self.debug(5, 'Created temporary file: ' + temp_file.name)
 
-        # Affichage de la fin de l'execution, en popup si l'on est pas en mode script
+            self.debug(5, 'Fetching data: ' + url)
+            if self.no_exec == False:
+                # Download the cab file
+                request = urllib2.Request(url, None)
+                url_file = urllib2.urlopen(request)
+                temp_file.write(url_file.read())
+                temp_file.flush()
+                url_file.close()
+
+            try:
+                # Create temp directory for cab extraction
+                temp_dir_name = tempfile.mkdtemp()
+            except:
+                self.debug(0, 'Cannot create temporary directory')
+                return False
+
+            try:
+                self.debug(5, 'Created temporary directory: ' + temp_dir_name)
+
+                try:
+                    if self.no_exec == False:
+                        cmd = 'cabextract -d ' + temp_dir_name + ' ' \
+                            + temp_file.name + '; touch ' + temp_dir_name \
+                            + '/*'
+                    else:
+                        cmd = 'echo cabextract -d ' + temp_dir_name + ' ' \
+                            + temp_file.name + '; echo touch ' \
+                            + temp_dir_name + '/*'
+                    self.debug(5, 'Launching command ' + cmd)
+                    p = subprocess.Popen(cmd, shell=True)
+                    p.wait()
+                except:
+                    self.debug(0, 'Impossible to extract data')
+                    return False
+
+                try:
+                    # Move every files into mounted ephem directory
+                    files = os.listdir(temp_dir_name)
+
+                    # Note: If the destination file is a
+                    # directory, shutil.move will fail.
+                    # We must provide the destination
+                    # filename to ensure proper overwrite.
+                    # Using dirname is not enough.
+                    for file in files:
+                        self.debug(5,
+                                'Moving file to final destination: '
+                                + temp_dir_name + '/' + file + ' -> '
+                                + self.mount + self.dest + '/'
+                                + file)
+                        shutil.move(temp_dir_name + '/' + file,
+                                self.mount + self.dest + '/' + file)
+                except:
+                    self.debug(0, 'Impossible to move data')
+                    return False
+
+            # The finally close will catch every events that leave out
+            # the try close (exception, return, break...)
+            finally:
+                self.debug(0, 'Delete temp dir content')
+                # Delete temp dir content
+                shutil.rmtree(temp_dir_name)
+        except:
+            self.debug(0, 'Impossible to fetch data')
+            return False
+        finally:
+            self.debug(0, 'Close and delete temp file')
+            # Close temp file and delete it automatically
+            temp_file.close()
+
         if self.no_gui == False:
             self.popup(_('GPSQuickFix completed'))
+
         self.debug(1, 'GPSQuickFix completed')
 
+        # Check the new expiry date
+        self.get_ephem_expiry()
+
         return True
+
 
     def get_pt_with_size(self, type=None, mount=None):
         ''' Retrieve mounted partitions name and size.
@@ -1567,38 +1617,33 @@ class NotebookTomtom:
 
 
     def frame_gpsquick_fix(self, notebook):
+        '''Create GPSQuickFix tab
+        '''
 
-        # --------------------------------------
-        # Onglet GPSQuickFix
-        # --------------------------------------
         frame = gtk.Frame(_('GPSQuickFix'))
         frame.set_border_width(10)
         frame.set_name('frameGPSQuickFix')
         frame.show()
 
-        # On crée une boite verticale
         tab_box = gtk.HBox(False, 2)
         tab_box.set_name('boxGPSQuickFix')
         frame.add(tab_box)
         tab_box.show()
 
-        # On crée une boite horizontale
         tab_box_left = gtk.VBox(False, 2)
         tab_box_left.set_size_request(120, -1)
         tab_box.add(tab_box_left)
         tab_box_left.show()
-        # On crée une boite horizontale
+
         tab_box_right = gtk.VBox(False, 2)
         tab_box_right.set_size_request(480, -1)
         tab_box.add(tab_box_right)
         tab_box_right.show()
 
-        # image
         image = gtk.Image()
         image.set_from_file(PIX_PATH + 'gpsquickfix.png')
         tab_box_left.pack_start(image, True, False, 2)
 
-        # label
         label = \
             gtk.Label(_('''This update sets the last known positions of the satellites.
 
@@ -1607,15 +1652,18 @@ and to initiate navigation more quickly...
 
 Please ensure that you have properly set your GPS parameters
 in the options.'''))
-        # On centre le texte
+
         label.set_justify(gtk.JUSTIFY_CENTER)
         tab_box_right.pack_start(label, True, False, 2)
 
-        # bouton maj quickfix
+        expiry = self.get_ephem_expiry()
+        label = gtk.Label('Expiry: ' + expiry)
+        label.set_justify(gtk.JUSTIFY_CENTER)
+        tab_box_right.pack_start(label, True, False, 2)
+
         if self.could_gps_fix:
             btn_csi = gtk.Button(_('Start GPSQuickfix update'))
             tab_box_right.pack_start(btn_csi, True, False, 2)
-            # On connecte le signal "clicked" du bouton a la fonction qui lui correspond
             btn_csi.connect('clicked', self.gps_quick_fix)
         else:
             btn_csi = \
@@ -1623,12 +1671,9 @@ in the options.'''))
                            ))
             btn_csi.set_sensitive(False)
             tab_box_right.pack_start(btn_csi, True, False, 2)
-            # On ne connecte à aucune fonction
 
         event_box = self.create_custom_tab(_('GPSQuickFix'), notebook, frame)
         notebook.append_page(frame, event_box)
-
-        return True
 
 
     def frame_backup_restore(self, notebook):
