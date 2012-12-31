@@ -2097,23 +2097,23 @@ For information, 25 minutes and 1GB on disk for a One Series 30'''))
     # fonction parcourir pour selectionner un dossier / conservation en cas de besoin def parcourir_gps( self,entry ):
     def select_folder(self, entry):
 
-        self.popup = gtk.FileChooserDialog(_('Open...'),
+        self.dialog = gtk.FileChooserDialog(_('Open...'),
                 gtk.Window(gtk.WINDOW_TOPLEVEL),
                 gtk.FILE_CHOOSER_ACTION_SELECT_FOLDER, (gtk.STOCK_CANCEL,
                 gtk.RESPONSE_CANCEL, gtk.STOCK_OPEN, gtk.RESPONSE_OK))
 
-        if self.popup.run() == gtk.RESPONSE_OK:
-            dossier = self.popup.get_filename()
+        if self.dialog.run() == gtk.RESPONSE_OK:
+            dossier = self.dialog.get_filename()
             self.debug(5, dossier)
             # self.labelfolder.set_text( dossier )
-            self.popup.destroy()
+            self.dialog.destroy()
 
         return True
 
     # fonction parcourir pour selectionner un fichier gtk.FILE_CHOOSER_ACTION_OPEN
     def select_img(self, entry):
 
-        self.popup = gtk.FileChooserDialog(_('Open folder...'),
+        self.dialog = gtk.FileChooserDialog(_('Open folder...'),
                 gtk.Window(gtk.WINDOW_TOPLEVEL), gtk.FILE_CHOOSER_ACTION_OPEN,
                 (gtk.STOCK_CANCEL, gtk.RESPONSE_CANCEL, gtk.STOCK_OPEN,
                 gtk.RESPONSE_OK))
@@ -2121,14 +2121,14 @@ For information, 25 minutes and 1GB on disk for a One Series 30'''))
         filter.set_name('images')
         filter.add_pattern('*.jpg')
         filter.add_pattern('*.png')
-        self.popup.add_filter(filter)
+        self.dialog.add_filter(filter)
         rep_home = os.getenv('HOME')
-        self.popup.set_current_folder(rep_home)
+        self.dialog.set_current_folder(rep_home)
 
-        if self.popup.run() == gtk.RESPONSE_OK:
-            img_selected = self.popup.get_filename()
+        if self.dialog.run() == gtk.RESPONSE_OK:
+            img_selected = self.dialog.get_filename()
             self.debug(5, img_selected)
-            self.popup.destroy()
+            self.dialog.destroy()
             # Verification de l'existence du fichier splash ou splashw.bmp
             if os.path.exists(self.mount + '/splashw.bmp'):
                 cmd = "convert '" + img_selected \
@@ -2151,31 +2151,31 @@ For information, 25 minutes and 1GB on disk for a One Series 30'''))
                     self.popup(_('Error'))
                     return True
 
-        # self.popup.destroy()
-        # self.Popup( _( "OK" ) )
+        # self.dialog.destroy()
+        # self.popup( _( "OK" ) )
 
         return True
 
     # fonction parcourir pour selectionner un fichier gtk.FILE_CHOOSER_ACTION_OPEN
     def add_poi_to_database(self, entry):
 
-        self.popup = gtk.FileChooserDialog(_('Open folder...'),
+        self.dialog = gtk.FileChooserDialog(_('Open folder...'),
                 gtk.Window(gtk.WINDOW_TOPLEVEL),
                 gtk.FILE_CHOOSER_ACTION_SELECT_FOLDER, (gtk.STOCK_CANCEL,
                 gtk.RESPONSE_CANCEL, gtk.STOCK_OPEN, gtk.RESPONSE_OK))
         filter = gtk.FileFilter()
         filter.set_name('POI (*.ov2)')
         filter.add_pattern('*.ov2')
-        self.popup.add_filter(filter)
+        self.dialog.add_filter(filter)
         rep_home = os.getenv('HOME')
-        self.popup.set_current_folder(rep_home)
+        self.dialog.set_current_folder(rep_home)
 
         if not os.path.exists(POI_PATH):
             # Creation du repertoire si inexistant
             os.mkdir(POI_PATH)
 
-        if self.popup.run() == gtk.RESPONSE_OK:
-            dir_selected = self.popup.get_filename()
+        if self.dialog.run() == gtk.RESPONSE_OK:
+            dir_selected = self.dialog.get_filename()
             self.debug(5, dir_selected)
             # on recupere juste le nom du repertoire qui servira a nommer le poi
             (filepath, filename) = os.path.split(dir_selected)
@@ -2191,7 +2191,7 @@ For information, 25 minutes and 1GB on disk for a One Series 30'''))
             # on rajoute la nouvelle entree a la liste
             self.poi_combo.append_text(filename)
 
-        self.popup.destroy()
+        self.dialog.destroy()
         self.popup(_('POI added to database'))
 
         return True
@@ -2200,7 +2200,7 @@ For information, 25 minutes and 1GB on disk for a One Series 30'''))
     def add_poi_to_tomtom(self, entry):
 
         selected_poi = self.poi_combo.get_active_text()
-        cmd = "cp '" + POI_PATH + selected_poi + "/'* '" + self.ptMount \
+        cmd = "cp '" + POI_PATH + selected_poi + "/'* '" + self.mount \
             + "'/" + self.current_map
         p = subprocess.Popen(cmd, shell=True)
         p.wait()
@@ -2214,7 +2214,7 @@ For information, 25 minutes and 1GB on disk for a One Series 30'''))
         selected_poi = self.poi_combo.get_active_text()
         files = os.listdir(POI_PATH + selected_poi)
         for file in files:
-            cmd = "rm -f '" + self.ptMount + "'/" + self.current_map + "/'" \
+            cmd = "rm -f '" + self.mount + "'/" + self.current_map + "/'" \
                 + file + "'"
             p = subprocess.Popen(cmd, shell=True)
             p.wait()
