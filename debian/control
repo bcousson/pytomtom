@@ -1,0 +1,13 @@
+Source: pytomtom
+Section: utils
+Priority: optional
+Maintainer: Benoit Cousson (PPA key) <benoit.cousson@gmail.com>
+Build-Depends: debhelper (>= 8.0.0), python-support, python (>= 2.5)
+Standards-Version: 3.9.3
+Homepage: http://pytomtom.tuxfamily.org
+
+Package: pytomtom
+Architecture: all
+Depends: python (>= 2.5), python-gtk2, cabextract, ${misc:Depends}
+Description: Manage TomTom GPS Device
+ Allow GPS quick fix update, save and restore and POI upload under Linux.
