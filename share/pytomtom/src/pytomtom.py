@@ -115,7 +115,7 @@ class NotebookTomtom:
     current_map = False
     # tab at pytomtom start, by default "About"
     # 0=options, 1=GPSQuickFix, 2=Save&Restore, 3=poi, 4=personalize, 5=about, 6=quit
-    box_init = 5
+    box_init = 1
     # chipset siRFStarIII models
     sirfstarIII = [
         'Carminat',
@@ -570,12 +570,10 @@ class NotebookTomtom:
 
 
     def get_config(self):
-        '''Fonction de lecture des donnees de configuration
+        '''Read application config data
 
-           La lecture du fichier de configuration, puis des options et
-           enfin des variables d'environnement
-           permet de definir l'ordre de preference des donnees si les
-           donnees sont fournies sous differentes formes
+           Read config file first, then options and environment
+           variables to override potentially the options.
         '''
 
         if not os.path.exists(CFG_PATH):
@@ -614,9 +612,9 @@ class NotebookTomtom:
 
                     self.debug(1, 'Load cfg: %s=%s' % (attr, line[1].strip()))
 
-        # Lecture de la carte utilisee
+        # Read information from mounted device.
 
-        # si carminat TODO mount loopdir
+        # In carminat case: TODO mount loopdir
         if self.model == 'Carminat':
             if not self.mount == False:
                 desktop_environment = 'generic'
@@ -637,13 +635,13 @@ class NotebookTomtom:
                 print cmd
                 p = subprocess.Popen(cmd, shell=True)
                 p.wait()
-                # TODO methode universelle ou monter un systeme sans etre root, mais la je reve...
+
+                # TODO: Use a generic method to mount without root privileges...
 
                 file_ttgobif = os.path.join('/tmp/vfs', 'CurrentMap.dat')
         else:
             self.mount = str(self.mount)
             file_ttgobif = os.path.join(self.mount, 'CurrentMap.dat')
-            # -->  /media/cle usb 4g/ttgo.bif [OK]
 
         #print str(file_ttgobif)
 
@@ -656,29 +654,25 @@ class NotebookTomtom:
                 # print self.CurrentMap
             ttgobif.close()
 
-        # Lecture des options
+        # Read options
         self.get_opts()
-        # Lecture des variables d'environnement
+        # Read environment variables
         self.get_variables()
 
-        # Si le point de montage ou le modele n'est pas defini, il faut le definir -> passage sur la fenetre de gestion des options
-        #       de meme si le point de montage n'est pas valide
+        # If mount point is not set, it must be defined first.
+        # Force the selection of the first tab.
         if self.mount == False or self.is_pt_mount(self.mount) == False \
             or self.model == False:
             self.box_init = 0
-            # self.Popup( _( "Connect your device and restart " ) + App )
 
-        # Validation des possibilites de l'application (verification
-        # des dependances externes)
-        # Lancement de la commande which cabextract qui precise
-        # l'emplacement de cabextract, renvoi 0 si trouve, 1 sinon
+        # Check dependency with external command
+        # cabextract
         p = subprocess.Popen('which cabextract > /dev/null', shell=True)
         if p.wait() != 0:
             self.debug(1, 'cabextract is not installed')
             self.could_gps_fix = False
 
-        # Lancement de la commande which tar qui precise l'emplacement
-        # de cabextract, renvoi 0 si trouve, 1 sinon
+        # tar
         p = subprocess.Popen('which tar > /dev/null', shell=True)
         if p.wait() != 0:
             self.debug(1, 'tar is not installed')
@@ -731,19 +725,19 @@ class NotebookTomtom:
         self.popup(_('Reload ') + APP + _(' to use this settings.'))
 
 
-    # Fonction de recherche des points de montage disponibles
     def get_pt_mounts(self):
+        '''Get available mount points
+        '''
 
         self.pt_mounts = []
-        # Recuperation de la liste des points de montage de type vfat, avec leur taille
+        # Get only vfat type of filesystem
         pt_mounts = self.get_pt_with_size('vfat')
-        # Pour chaque point de montage
+
         for (pt_mount_size, mount) in pt_mounts:
             if pt_mount_size == -1:
-                self.debug(5, 'No mounting point')  # 5
+                self.debug(5, 'No mounting point')
                 return True
 
-            # Validation du point de montage
             if self.is_pt_mount(mount):
                 self.pt_mounts.append([pt_mount_size, mount])
 
@@ -754,7 +748,6 @@ class NotebookTomtom:
 
     def is_pt_mount(self, mount_point):
 
-        # Si le point de montage n'est pas fourni ou est faux
         if mount_point == False:
             return False
 
@@ -779,7 +772,6 @@ class NotebookTomtom:
 
     def get_ephem_expiry(self):
         '''Read GPS quick fix data expiry date
-
         '''
 
         d = 'Date unknown'
@@ -816,7 +808,7 @@ class NotebookTomtom:
         '''Download GPS quick fix data
 
         Download from TOMTOM web site the data file containing
-        satellites position for the next 6 days.
+        satellites position for the next 7 days.
         '''
 
         self.debug(0, 'Starting GpsQuickFix...')
@@ -953,9 +945,7 @@ class NotebookTomtom:
     def get_pt_with_size(self, type=None, mount=None):
         ''' Retrieve mounted partitions name and size.
 
-            limite par un type de systeme,
-            ou/et un point de montage
-
+            Check for type filesystem only, and/or a given mount point.
         '''
 
         # Use df command,
@@ -983,8 +973,7 @@ class NotebookTomtom:
         # cmd += " 2> /dev/null | tail -n +2 | tr -s ' ' | cut -d ' ' -f 4,7 --output-delimiter=,"
         cmd += " 2> /dev/null | tail -n +2 | tr -s ' ' | cut -d ' ' -f 4,7-"
 
-        # Lancement de la commande, avec recuperation du stdout dans le
-        # processus actuel
+        # Get stdout output to print it in the application
         self.debug(5, 'launching command: ' + cmd)  # 5
         p = subprocess.Popen(cmd, stdout=subprocess.PIPE, shell=True)
         res = []
@@ -1007,15 +996,14 @@ class NotebookTomtom:
         # Renvoi des donnees collectees
         return res
 
-    # Fonction de recherche d'un enfant de self.window, le nom fourni
-    # sous la forme nom_frame.nom_box.... 7
-    def search_obj(self, name):
 
-        # TODO : existe-t-il deja une fonction plus rapide ?
-        # Decoupage du nom par le separateur "."
+    def search_obj(self, name):
+        '''Search self.window child frame_name.box_name
+        '''
+
         name = name.split('.')
 
-        # On commence au niveau self.window
+        # Start with self.window
         obj_parent = self.window
         self.debug(7, 'Searched object: ' + str(name))
 
@@ -1032,7 +1020,8 @@ class NotebookTomtom:
                 # Si le nom correspond
                 if obj_child.get_name() == name[i]:
                     self.debug(7, 'Object found')
-                    # Le parent devient l'enfant pour continuer la recherche au niveau suivant
+                    # Le parent devient l'enfant pour continuer la
+                    # recherche au niveau suivant
                     obj_parent = obj_child
                     # On a bien trouve l'enfant
                     find = True
@@ -1042,11 +1031,14 @@ class NotebookTomtom:
             if find == False:
                 return None
 
-        # retour de l'enfant, comme le parent est devenu l'enfant, il suffit de retourner le parent (on est sur qu'il est defini)
+        # retour de l'enfant, comme le parent est devenu l'enfant,
+        # il suffit de retourner le parent (on est sur qu'il est defini)
         return obj_parent
 
-    # fonction de remplacement image de demarrage avec toutes les verifications utiles
+
     def change_start_img(self, widget):
+        '''Change startup picture
+        '''
 
         # TODO : mettre en place la reconnaissance des noms des images a remplacer
         if os.path.exists(self.mount + '/splash.bmp'):
@@ -1058,10 +1050,12 @@ class NotebookTomtom:
 
                 # subprocess.call( [ "convert image.jpg -resize 480x272 -background black -gravity center -extent 480x272 splash.bmp" ], shell = True )
 
-    # Fonction de creation d'un nom de fichier de sauvegarde
-    def get_new_file_name(self, uniq=False):
 
-        # si l'option uniq est fournie, on ajoute un nombre aleatoire
+    def get_new_file_name(self, uniq=False):
+        '''Create backup filename
+        '''
+
+        # Add a random number to ensure uniqueness
         if uniq == False:
             return BACKUP_PATH + '/sv-' + str(date.today()) + '-' \
                 + self.model + '.tar'
@@ -1069,15 +1063,16 @@ class NotebookTomtom:
             return BACKUP_PATH + '/sv' + str(random.randint(1, 50)) + '-' \
                 + str(date.today()) + '-' + self.model + '.tar'
 
-    # fonction de lancement du Backup et de la restauration avec toutes les verifications utiles
-    def backup_restore_gps(self, widget, type):
 
-        # Verification du point de montage
+    def backup_restore_gps(self, widget, type):
+        '''Run backup and restore
+        '''
+
         if not self.is_pt_mount(self.mount):
             self.debug(1, 'Invalid mounting point: ' + self.mount)
             return False
 
-        # Recuperation du nom du fichier de sauvegarde
+        # Get backup filename
         files = self.save_file_combo.get_model()
         index = self.save_file_combo.get_active()
         if files[index][0] == '':
@@ -1103,7 +1098,7 @@ class NotebookTomtom:
             if obj != None:
                 obj.set_sensitive(False)
 
-        # Verification de l'espace disponible par rapport a l'espace initial,
+        # Check filesystem available room,
 
         # Recuperation d'un tableau de toutes les partitions de type
         #     les donnees sont sur la ligne 0 puisque nous n'avons qu'une seule ligne
@@ -1514,51 +1509,46 @@ class NotebookTomtom:
 
     def frame_option(self, notebook):
 
-        # --------------------------------------
-        # Onglet OPTIONS
-        # --------------------------------------
         frame = gtk.Frame(_('Options'))
         frame.set_border_width(10)
         frame.set_name('frameOptions')
         frame.show()
 
-        # On crée une boite verticale
         tab_box = gtk.HBox(False, 2)
         tab_box.set_name('frameOptions')
         frame.add(tab_box)
         tab_box.show()
 
-        # On crée une boite horizontale
         tab_box_left = gtk.VBox(False, 2)
         tab_box_left.set_size_request(120, -1)
         tab_box.add(tab_box_left)
         tab_box_left.show()
-        # On crée une boite horizontale
+
         tab_box_right = gtk.VBox(False, 2)
         tab_box_right.set_size_request(480, -1)
         tab_box.add(tab_box_right)
         tab_box_right.show()
 
-        # image
         image = gtk.Image()
         image.set_from_file(PIX_PATH + 'options.png')
         tab_box_left.pack_start(image, True, False, 2)
 
         label = gtk.Label(_('Please indicate the mounting point of your Tomtom:'
                           ))
-        label.set_justify(gtk.JUSTIFY_CENTER)
+        label.set_alignment(0, 0)
         tab_box_right.pack_start(label, True, False, 2)
 
         # List potential TOMTOM mount point
         self.make_combo()
         tab_box_right.pack_start(self.pt_combo, True, False, 0)
+
         # Start automatic update every 2 secondes
         self.tempo_combo = gobject.timeout_add(2000, self.make_combo)
 
         hs = gtk.HSeparator()
         tab_box_right.pack_start(hs, False, False, 2)
 
-        # Model list
+        # TOMTOM models combo list
         self.modele_combo = gtk.combo_box_new_text()
         i = 0
         for text in self.models:
@@ -1573,10 +1563,10 @@ class NotebookTomtom:
         tab_box_right.pack_start(hs, False, False, 2)
 
         label = gtk.Label(_('During backup or restore, display:'))
-        label.set_justify(gtk.JUSTIFY_CENTER)
+        label.set_alignment(0, 0)
         tab_box_right.pack_start(label, True, False, 2)
 
-        # Case a cocher pour l'affichage du temps passe dans la barre de progression
+        # Progress bar elapsed time
         button = gtk.CheckButton(_('elapsed time'), False)
         button.set_name('config_time_passed')
         button.connect('clicked', self.update_config_time)
@@ -1584,7 +1574,7 @@ class NotebookTomtom:
             button.set_active(True)
         tab_box_right.pack_start(button, True, False, 0)
 
-        # Case a cocher pour l'affichage du temps estime restant dans la barre de progression
+        # Progress bar remaining time
         button = gtk.CheckButton(_('remaining time'), False)
         button.set_name('config_time_remind')
         button.connect('clicked', self.update_config_time)
@@ -1592,7 +1582,7 @@ class NotebookTomtom:
             button.set_active(True)
         tab_box_right.pack_start(button, True, False, 0)
 
-        # Case a cocher pour l'affichage du temps estime total dans la barre de progression
+        # Progress bar total time
         button = gtk.CheckButton(_('total time'), False)
         button.set_name('config_time_tot')
         button.connect('clicked', self.update_config_time)
@@ -1600,14 +1590,11 @@ class NotebookTomtom:
             button.set_active(True)
         tab_box_right.pack_start(button, True, False, 0)
 
-        # separator
         hs = gtk.HSeparator()
         tab_box_right.pack_start(hs, True, False, 2)
 
         button = gtk.Button(stock=gtk.STOCK_SAVE)
         tab_box_right.pack_start(button, True, False, 0)
-
-        # Connexion du signal "clicked" du GtkButton
         button.connect('clicked', self.on_update)
 
         event_box = self.create_custom_tab(_('Options'), notebook, frame)
@@ -1645,15 +1632,15 @@ class NotebookTomtom:
         tab_box_left.pack_start(image, True, False, 2)
 
         label = \
-            gtk.Label(_('''This update sets the last known positions of the satellites.
+            gtk.Label(_('''Download the known positions of the satellites for the next 7 days.
 
-It allows your GPS to find its initial position in less than 30 seconds
-and to initiate navigation more quickly...
+It allows the GPS to find its initial position in less than 30 seconds
+and to initiate navigation quickly...
 
-Please ensure that you have properly set your GPS parameters
+Please ensure that you have properly set the GPS parameters
 in the options.'''))
 
-        label.set_justify(gtk.JUSTIFY_CENTER)
+        label.set_alignment(0, 0)
         tab_box_right.pack_start(label, True, False, 2)
 
         expiry = self.get_ephem_expiry()
@@ -1678,38 +1665,30 @@ in the options.'''))
 
     def frame_backup_restore(self, notebook):
 
-        # ---------------------------------------------------------------------
-        # Onglet SAUVEGARDE ET RESTAURATION
-        # ---------------------------------------------------------------------
-
         frame = gtk.Frame(_('Backup and restore'))
         frame.set_border_width(10)
         frame.set_name('frameSaveRestore')
         frame.show()
 
-        # On crée une boite verticale
         tab_box = gtk.HBox(False, 2)
         tab_box.set_name('boxSaveRestore')
         frame.add(tab_box)
         tab_box.show()
 
-        # On crée une boite horizontale
         tab_box_left = gtk.VBox(False, 2)
         tab_box_left.set_size_request(120, -1)
         tab_box.add(tab_box_left)
         tab_box_left.show()
-        # On crée une boite horizontale
+
         tab_box_right = gtk.VBox(False, 2)
         tab_box_right.set_size_request(480, -1)
         tab_box.add(tab_box_right)
         tab_box_right.show()
 
-        # image
         image = gtk.Image()
         image.set_from_file(PIX_PATH + 'saverestore.png')
         tab_box_left.pack_start(image, True, False, 2)
 
-        # Text pour le choix du fichier de sauvegarde
         label = gtk.Label(_('Backup file:'))
         label.set_justify(gtk.JUSTIFY_CENTER)
         tab_box_right.pack_start(label, True, False, 2)
@@ -1842,35 +1821,31 @@ For information, 25 minutes and 1GB on disk for a One Series 30'''))
 
         return True
 
+
     def frame_poi(self, notebook):
 
-        # --------------------------------------
-        # Onglet POI
-        # --------------------------------------
         frame = gtk.Frame(_('POI'))
         frame.set_border_width(10)
         frame.set_name('framePoi')
         frame.show()
-        # On crée une boite verticale
+
         tab_box = gtk.HBox(False, 2)
         tab_box.set_name('boxPoi')
         frame.add(tab_box)
         tab_box.show()
 
-        # On crée une boite horizontale
         tab_box_left = gtk.VBox(False, 2)
         tab_box_left.set_name('tabBoxLeftPoi')
         tab_box_left.set_size_request(120, -1)
         tab_box.add(tab_box_left)
         tab_box_left.show()
-        # On crée une boite horizontale
+
         tab_box_right = gtk.VBox(False, 2)
         tab_box_right.set_name('tabBoxRightPoi')
         tab_box_right.set_size_request(480, -1)
         tab_box.add(tab_box_right)
         tab_box_right.show()
 
-        # image
         image = gtk.Image()
         image.set_from_file(PIX_PATH + 'poi.png')
         tab_box_left.pack_start(image, True, False, 2)
@@ -1880,7 +1855,6 @@ For information, 25 minutes and 1GB on disk for a One Series 30'''))
         labelfirststep.set_justify(gtk.JUSTIFY_CENTER)
         tab_box_right.pack_start(labelfirststep, True, False, 2)
 
-        # bouton
         btndb_add_poi = gtk.Button(_('Add POI (.ov2) to database...'))
         tab_box_right.pack_start(btndb_add_poi, True, False, 2)
         btndb_add_poi.connect('clicked', self.add_poi_to_database)
@@ -1947,43 +1921,36 @@ For information, 25 minutes and 1GB on disk for a One Series 30'''))
 
     def frame_personalize(self, notebook):
 
-        # --------------------------------------
-        # Onglet PERSONNALISER
-        # --------------------------------------
         frame = gtk.Frame(_('Personalize'))
         frame.set_border_width(10)
         frame.set_name('Personalize')
         frame.show()
-        # On crée une boite verticale
+
         tab_box = gtk.HBox(False, 2)
         tab_box.set_name('boxPersonalize')
         frame.add(tab_box)
         tab_box.show()
 
-        # On crée une boite horizontale
         tab_box_left = gtk.VBox(False, 2)
         tab_box_left.set_size_request(120, -1)
-        tab_box.add(tab_box_left)
+        tab_box.pack_start(tab_box_left, True, False, 2)
         tab_box_left.show()
-        # On crée une boite horizontale
+
         tab_box_right = gtk.VBox(False, 2)
         tab_box_right.set_size_request(480, -1)
-        tab_box.add(tab_box_right)
+        tab_box.pack_start(tab_box_right, True, False, 10)
         tab_box_right.show()
 
-        # image
         image = gtk.Image()
         image.set_from_file(PIX_PATH + 'personalize.png')
         tab_box_left.pack_start(image, True, False, 2)
 
-        # label
         label = \
-            gtk.Label(_('Replace the startup screen of your GPS by the picture of your choice'
+            gtk.Label(_('Replace the splash screen of the GPS by the picture of your choice'
                       ))
         tab_box_right.pack_start(label, True, False, 2)
         # TODO verifier presence ImageMagick
         # subprocess.call( [ "convert image.jpg -resize 320x240 -background black -gravity center -extent 320x240 splash.bmp" ], shell = True )
-        # bouton
         b = gtk.Button(_('Select image...'))
         tab_box_right.pack_start(b, True, False, 2)
         b.connect('clicked', self.select_img)
@@ -1994,29 +1961,23 @@ For information, 25 minutes and 1GB on disk for a One Series 30'''))
 
         return True
 
-    # Fonction de creation de la frame a propos
+
     def frame_about(self, notebook):
 
-        # --------------------------------------
-        # Onglet A PROPOS
-        # --------------------------------------
         frame = gtk.Frame(_('About'))
         frame.set_border_width(10)
         frame.set_name('frameAbout')
         frame.show()
 
-        # On crée une boite horizontale
         tab_box = gtk.VBox(False, 2)
         tab_box.set_name('boxAbout')
         frame.add(tab_box)
         tab_box.show()
 
-        # image
         image = gtk.Image()
         image.set_from_file(PIX_PATH + 'pytomtom.png')
         tab_box.pack_start(image, True, False, 2)
 
-        # On crée un label "text" (text donné en attribut)
         tab_label = gtk.Label(_('version ') + VER)
         tab_label.set_justify(gtk.JUSTIFY_CENTER)
         tab_box.pack_start(tab_label, True, False, 2)
@@ -2038,44 +1999,37 @@ For information, 25 minutes and 1GB on disk for a One Series 30'''))
 
         return True
 
-    # Fonction de creation de la frame quit
+
     def frame_quit(self, notebook):
 
-        # --------------------------------------
-        # Onglet QUITTER
-        # --------------------------------------
         frame = gtk.Frame(_('Exit'))
         frame.set_border_width(10)
         frame.set_name('frameQuit')
         frame.show()
 
-        # On crée une boite verticale
         tab_box = gtk.HBox(False, 2)
         tab_box.set_name('boxQuit')
         frame.add(tab_box)
         tab_box.show()
 
-        # On crée une boite horizontale
         tab_box_left = gtk.VBox(False, 2)
         tab_box_left.set_size_request(120, -1)
         tab_box.add(tab_box_left)
         tab_box_left.show()
-        # On crée une boite horizontale
+
         tab_box_right = gtk.VBox(False, 2)
         tab_box_right.set_size_request(480, -1)
         tab_box.add(tab_box_right)
         tab_box_right.show()
 
-        # image
         image = gtk.Image()
         image.set_from_file(PIX_PATH + 'quit.png')
         tab_box_left.pack_start(image, True, False, 2)
 
-        # label
         label = gtk.Label(_("Don't forget to cleanly unmount your TomTom!"))
         tab_box_right.pack_start(label, True, False, 2)
 
-        # demontage propre du GPS
+        # Umount GPS properly
         btn_unmount = gtk.Button(_('Unmount'))
         # TODO: griser le btn si gps pas branche
         if self.box_init == 0:
@@ -2083,7 +2037,6 @@ For information, 25 minutes and 1GB on disk for a One Series 30'''))
         tab_box_right.pack_start(btn_unmount, True, False, 2)
         btn_unmount.connect('clicked', self.umount)
 
-        # bouton quitter
         btn_quit = gtk.Button(stock=gtk.STOCK_QUIT)
         tab_box_right.pack_start(btn_quit, True, False, 2)
         btn_quit.connect('clicked', self.delete)
