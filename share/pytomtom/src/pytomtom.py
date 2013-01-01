@@ -1507,6 +1507,96 @@ class NotebookTomtom:
         return True
 
 
+    def update_status(self, widget):
+
+        name = widget.get_name()
+        self.debug(1, name)
+
+
+    def frame_status(self, notebook):
+        '''Create Status tab
+        '''
+
+        frame = gtk.Frame(_('Status'))
+        frame.set_border_width(10)
+        frame.set_name('Status')
+        frame.show()
+
+        tab_box = gtk.HBox(False, 2)
+        tab_box.set_name('boxStatus')
+        frame.add(tab_box)
+        tab_box.show()
+
+        tab_box_left = gtk.VBox(True, 2)
+        tab_box_left.set_size_request(120, -1)
+        tab_box.add(tab_box_left)
+        tab_box_left.show()
+
+        tab_box_mid = gtk.VBox(True, 2)
+        tab_box_mid.set_size_request(140, -1)
+        tab_box.add(tab_box_mid)
+        tab_box_mid.show()
+
+        label = gtk.Label('''<b>Model
+Serial Number
+UID
+RamDiskVersion
+BootLoaderVersion
+LinuxVersion
+VersionNumber
+ApplicationVersion
+CurrentMap
+CurrentMapVersion
+GPSFirmwareVersion
+Features
+</b>''')
+        label.set_use_markup(True)
+        label.set_alignment(0, 0)
+        label.set_padding(0, 10)
+        tab_box_mid.pack_start(label, True, True, 2)
+
+        tab_box_right = gtk.VBox(False, 2)
+        tab_box_right.set_size_request(340, -1)
+        tab_box.add(tab_box_right)
+        tab_box_right.show()
+
+        label = gtk.Label('''<span foreground="blue"><b>XL IQ Routes Edition</b>
+RS4269G01574
+AKTYN A2G4W
+20120927
+55277
+842337
+9465
+1074274.2
+Europe_South
+900.4602
+2.16.201 77382
+PlusOrRDSTMCTraffic, PlusEphemeris, PlusSafetyCamerasDynamic, PlusSafetyCamerasStatic, PlusFuelPrices, HomeBackup, VoiceBrowser, LinkVolumeToSpeed, MapShare, Newyork, Itinerary, Caymann, Durham, Leeway, CarSymbol, RichPOI, PermanentMapCfg, RDSTMC, InternalFlash, SettingsOverride, SDK, USBAccessories, MultipleMaps, Traffic, MapOverlays, Documents, WarningSounds, DangerZonesCameras</span>''')
+        label.set_use_markup(True)
+        label.set_alignment(0, 0)
+        label.set_padding(0,10)
+        label.set_line_wrap(True)
+        label.set_selectable(True)
+        tab_box_right.pack_start(label, True, True, 2)
+
+        fr = gtk.Frame(_('Picture'))
+        fr.set_border_width(10)
+        fr.set_name('Status')
+
+        image = gtk.Image()
+        image.set_from_file(PIX_PATH + 'gpsquickfix.png')
+        tab_box_left.pack_start(image, True, True, 2)
+
+#        btn_csi = gtk.Button(_('Update'))
+#        tab_box_right.pack_start(btn_csi, True, False, 2)
+#        btn_csi.connect('clicked', self.update_status)
+#        btn_csi.set_sensitive(False)
+#        tab_box_right.pack_start(btn_csi, True, False, 2)
+
+        event_box = self.create_custom_tab(_('Status'), notebook, frame)
+        notebook.append_page(frame, event_box)
+
+
     def frame_option(self, notebook):
 
         frame = gtk.Frame(_('Options'))
@@ -2224,6 +2314,7 @@ For information, 25 minutes and 1GB on disk for a One Series 30'''))
 
             # Build tabs
             self.frame_option(notebook)
+            self.frame_status(notebook)
             if self.box_init != 0:
                 self.frame_gpsquick_fix(notebook)
                 self.frame_backup_restore(notebook)
