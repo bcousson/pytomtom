@@ -1734,8 +1734,10 @@ in the options.'''))
         tab_box_right.pack_start(label, True, False, 2)
 
         expiry = self.get_ephem_expiry()
-        label = gtk.Label('Expiry: ' + expiry)
-        label.set_justify(gtk.JUSTIFY_CENTER)
+        label = gtk.Label('<b>Expiry</b> <span foreground="blue">%s</span>' % expiry)
+        label.set_alignment(0, 0)
+        label.set_use_markup(True)
+        label.set_justify(gtk.JUSTIFY_RIGHT)
         tab_box_right.pack_start(label, True, False, 2)
 
         if self.could_gps_fix:
