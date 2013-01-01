@@ -2028,21 +2028,38 @@ For information, 25 minutes and 1GB on disk for a One Series 30'''))
 
         tab_box_right = gtk.VBox(False, 2)
         tab_box_right.set_size_request(480, -1)
-        tab_box.pack_start(tab_box_right, True, False, 10)
+        tab_box.pack_start(tab_box_right, True, False, 5)
         tab_box_right.show()
+
+        bt_box = gtk.HBox(False, 2)
+        tab_box_right.add(bt_box)
 
         image = gtk.Image()
         image.set_from_file(PIX_PATH + 'personalize.png')
         tab_box_left.pack_start(image, True, False, 2)
 
         label = \
-            gtk.Label(_('Replace the splash screen of the GPS by the picture of your choice'
+            gtk.Label(_('Replace the GPS splash screen by the picture of your choice'
                       ))
-        tab_box_right.pack_start(label, True, False, 2)
-        # TODO verifier presence ImageMagick
+        label.set_alignment(0, 0.5)
+        bt_box.pack_start(label, True, True, 2)
+
+        # Get the current splash.bmp or splashw.bmp
+        if os.path.exists(self.mount + '/splashw.bmp'):
+            splash = self.mount + '/splashw.bmp'
+        elif os.path.exists(self.mount + '/splash.bmp'):
+            splash = self.mount + '/splash.bmp'
+        else:
+            splash = None
+
+        image = gtk.Image()
+        image.set_from_file(splash)
+        tab_box_right.pack_start(image, True, False, 5)
+
+        # TODO Check if ImageMagick is installed
         # subprocess.call( [ "convert image.jpg -resize 320x240 -background black -gravity center -extent 320x240 splash.bmp" ], shell = True )
         b = gtk.Button(_('Select image...'))
-        tab_box_right.pack_start(b, True, False, 2)
+        bt_box.pack_start(b, False, False, 2)
         b.connect('clicked', self.select_img)
 
         event_box = self.create_custom_tab(_('Personalize'), notebook, frame)
